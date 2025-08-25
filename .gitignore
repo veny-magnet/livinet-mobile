@@ -1,0 +1,100 @@
+# -------------------------
+# OS / Editor miscellanous
+# -------------------------
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+Thumbs.db
+.atom/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ / Android Studio
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# VS Code (keep only project configs; optional)
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+# If you prefer to commit all .vscode, comment the 4 lines above and uncomment:
+# .vscode/
+
+# -------------------------
+# Flutter / Dart / Pub
+# -------------------------
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub/
+.pub-cache/
+**/doc/api/
+**/ios/Flutter/.last_build_id
+/build/
+coverage/
+flutter_*.png
+app.*.symbols
+app.*.map.json
+
+# -------------------------
+# Android
+# -------------------------
+/android/.gradle/
+/android/.cxx/
+/android/local.properties          # SDK path (machine-specific)
+/android/key.properties            # signing config (keep private)
+/android/app/*.jks                 # keystores (private)
+/android/app/*.keystore
+/android/app/debug
+/android/app/profile
+/android/app/release
+# Optional: keep Firebase file private (team choice)
+# /android/app/google-services.json
+
+# -------------------------
+# iOS
+# -------------------------
+/ios/Pods/
+/ios/.symlinks/
+/ios/Flutter/Flutter.podspec
+/ios/Flutter/Generated.xcconfig
+/ios/Flutter/ephemeral/
+/ios/Runner/GeneratedPluginRegistrant.*
+
+# -------------------------
+# macOS
+# -------------------------
+/macos/Pods/
+/macos/.symlinks/
+/macos/Flutter/ephemeral/
+/macos/Flutter/GeneratedPluginRegistrant.*
+
+# -------------------------
+# Windows
+# -------------------------
+/windows/flutter/ephemeral/
+/windows/runner/Debug/
+/windows/runner/Release/
+
+# -------------------------
+# Linux
+# -------------------------
+/linux/flutter/ephemeral/
+
+# -------------------------
+# Env / secrets
+# -------------------------
+.env
+.env.*
+*.keystore
+*.jks
+*.keystore.properties
