@@ -60,8 +60,7 @@ class AppTheme {
       ),
 
       inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: Colors.white,
+        filled: false,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(Corners.md),
         ),
