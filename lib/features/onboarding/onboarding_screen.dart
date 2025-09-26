@@ -7,7 +7,6 @@ import '../../core/widgets/app_button.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
-
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
@@ -54,22 +53,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.sm, Gaps.lg, 0),
+            Padding(padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.sm, Gaps.lg, 0),
               child: Row(
                 children: [
                   const SizedBox(width: 48),
                   const Spacer(),
-                  TextButton(
-                    onPressed: _finish,
-                    child: const Text('Skip'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: c.secondary,
-                      textStyle: const TextStyle(
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
+                  TextButton(onPressed: _finish,style: TextButton.styleFrom(foregroundColor: c.secondary, textStyle: const TextStyle(fontSize: 16),), child: const Text('Skip'),),
                 ],
               ),
             ),
@@ -100,18 +89,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Container(
-                                width: placeholderSize,
-                                height: placeholderSize,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE0E0E0),
-                                  borderRadius: BorderRadius.circular(16),
+                              Container(width: placeholderSize,height: placeholderSize,
+                                decoration: BoxDecoration(color: const Color(0xFFE0E0E0),borderRadius: BorderRadius.circular(16),
                                   boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.05),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 4),
-                                    ),
+                                    BoxShadow(color: Colors.black.withValues(alpha: 0.05),blurRadius: 12, offset: const Offset(0, 4),),
                                   ],
                                 ),
                               ),
@@ -125,28 +106,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               ),
 
                               const SizedBox(height: textTopGap),
-                              Text(
-                                p.title,
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
+                              Text(p.title, style: const TextStyle( fontSize: 24, fontWeight: FontWeight.w800,), textAlign: TextAlign.center,),
                               const SizedBox(height: titleSubtitleGap),
                               ConstrainedBox(
-                                constraints:
-                                    BoxConstraints(maxWidth: maxW * 0.9),
-                                child: Text(
-                                  p.subtitle,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.normal,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface
-                                        .withOpacity(0.75),
-                                  ),
+                                constraints:BoxConstraints(maxWidth: maxW * 0.9),
+                                child: Text(p.subtitle, style: TextStyle( fontSize: 14, fontWeight: FontWeight.normal,
+                                color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.75), 
+                                ),
                                   textAlign: TextAlign.center,
                                 ),
                               ),
@@ -201,7 +170,6 @@ class _Dots extends StatelessWidget {
   final Color inactiveColor;
 
   const _Dots({
-    super.key,
     required this.count,
     required this.activeIndex,
     required this.activeColor,
@@ -219,10 +187,7 @@ class _Dots extends StatelessWidget {
           margin: const EdgeInsets.symmetric(horizontal: 4),
           height: 8,
           width: active ? 20 : 8,
-          decoration: BoxDecoration(
-            color: active ? activeColor : inactiveColor,
-            borderRadius: BorderRadius.circular(999),
-          ),
+          decoration: BoxDecoration(color: active ? activeColor : inactiveColor, borderRadius: BorderRadius.circular(999),),
         );
       }),
     );

@@ -16,7 +16,7 @@ class AppButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final textStyle = const TextStyle(
       fontSize: 16,
-      fontWeight: FontWeight.w800,
+      fontWeight: FontWeight.w900,
     );
 
     final shadow = [
