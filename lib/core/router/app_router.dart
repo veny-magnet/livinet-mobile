@@ -5,6 +5,7 @@ import 'package:livinet_mobile/features/login/login_screen.dart';
 import '../../features/splash/splash_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/home/home_screen.dart';
+import '../../features/signup/signup_screen.dart';
 
 CustomTransitionPage<void> _fadePage(GoRouterState state, Widget child) {
   return CustomTransitionPage<void>(
@@ -32,6 +33,10 @@ class AppRouter {
       GoRoute(
         path: '/login',
         pageBuilder: (context, state) => _fadePage(state, const LoginScreen()),
+      ),
+       GoRoute(
+        path: '/signup',
+        pageBuilder: (context, state) => _fadePage(state, const SignupScreen()),
       ),
       GoRoute(
         path: '/home',
