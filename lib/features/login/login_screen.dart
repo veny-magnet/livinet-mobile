@@ -110,7 +110,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: () {
-                        debugPrint("Forgot Password tapped");
+                        context.go('/forgotpass');
                       },
                       style: TextButton.styleFrom( padding: EdgeInsets.zero, minimumSize: const Size(0, 0), tapTargetSize: MaterialTapTargetSize.shrinkWrap,),
                       child: const Text(
