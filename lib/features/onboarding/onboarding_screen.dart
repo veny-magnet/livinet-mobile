@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:liquid_swipe/liquid_swipe.dart';
@@ -13,6 +14,8 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final _controller = LiquidController();
+  Timer? _autoSlideTimer;
+  bool _isUserInteracting = true;
 
   final _pages = const [
     _OnboardPageData(
@@ -34,15 +37,65 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   int _index = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    _startAutoSlideTimer();
+  }
+
+  @override
+  void dispose() {
+    _autoSlideTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startAutoSlideTimer() {
+    _autoSlideTimer?.cancel();
+    _autoSlideTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (!_isUserInteracting && mounted) {
+        _autoNext();
+      }
+    });
+  }
+
+  void _stopAutoSlideTimer() {
+    _autoSlideTimer?.cancel();
+  }
+
+  void _resetAutoSlideTimer() {
+    _startAutoSlideTimer();
+  }
+
+  void _autoNext() {
+    if (_index >= _pages.length - 1) {
+      _stopAutoSlideTimer();
+      _finish();
+    } else {
+      final next = _index + 1;
+      _controller.animateToPage(page: next, duration: 800);
+    }
+  }
+
   void _finish() => context.go('/login');
 
   void _next() {
+    _stopAutoSlideTimer();
+    _isUserInteracting = true;
+    
     if (_index >= _pages.length - 1) {
       _finish();
     } else {
       final next = _index + 1;
       _controller.animateToPage(page: next, duration: 600);
     }
+    
+    // Reset user interaction flag after animation
+    Future.delayed(const Duration(milliseconds: 700), () {
+      if (mounted) {
+        _isUserInteracting = false;
+        _resetAutoSlideTimer();
+      }
+    });
   }
 
   @override
@@ -126,17 +179,38 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     );
                   }).toList();
 
-                  return LiquidSwipe.builder(
-                    itemCount: pages.length,
-                    itemBuilder: (_, i) => pages[i],
-                    liquidController: _controller,
-                    onPageChangeCallback: (i) => setState(() => _index = i),
-                    enableLoop: false,
-                    fullTransitionValue: 450,
-                    waveType: WaveType.liquidReveal,
-                    enableSideReveal: false,
-                    ignoreUserGestureWhileAnimating: true,
-                    slideIconWidget: const SizedBox.shrink(),
+                  return GestureDetector(
+                    onPanStart: (_) {
+                      _isUserInteracting = true;
+                      _stopAutoSlideTimer();
+                    },
+                    onPanEnd: (_) {
+                      Future.delayed(const Duration(milliseconds: 500), () {
+                        if (mounted) {
+                          _isUserInteracting = false;
+                          _resetAutoSlideTimer();
+                        }
+                      });
+                    },
+                    child: LiquidSwipe.builder(
+                      itemCount: pages.length,
+                      itemBuilder: (_, i) => pages[i],
+                      liquidController: _controller,
+                      onPageChangeCallback: (i) {
+                        setState(() => _index = i);
+                        // Reset timer when page changes
+                        if (!_isUserInteracting) {
+                          _resetAutoSlideTimer();
+                        }
+                      },
+                      enableLoop: false,
+                      fullTransitionValue: 400,
+                      slideIconWidget: const SizedBox.shrink(),
+                      waveType: WaveType.liquidReveal,
+                      enableSideReveal: true,
+                      ignoreUserGestureWhileAnimating: false,
+                      positionSlideIcon: 0.8,
+                    ),
                   );
                 },
               ),

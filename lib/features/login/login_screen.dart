@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/widgets/app_text_input.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/services/auth_service.dart';
+import '../../core/services/fcm_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -11,10 +13,90 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  void _onLogin(BuildContext context) {
-    debugPrint("Login pressed");
-    context.go('/home');
+  bool _isLoading = false;
+  String _loadingMessage = '';
+  final AuthService _authService = AuthService();
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  void _showSuccess(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  Future<void> _onLogin(BuildContext context) async {
+    if (_isLoading) return;
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    
+    // Basic validation
+    if (email.isEmpty || password.isEmpty) {
+      _showError('Email and password are required');
+      return;
+    }
+    
+    // Email format validation
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+      _showError('Email must be in format: example@domain.com');
+      return;
+    }
+    
+    setState(() {
+      _isLoading = true;
+      _loadingMessage = 'Signing in...';
+    });
+    
+    try {
+      // Get FCM token
+      String fcmToken = await FcmService.getTokenForRegistration();
+      final result = await _authService.login(
+        email: email,
+        password: password,
+        fcmToken: fcmToken,
+      );
+      
+      if (result['success']) {
+        _showSuccess('Login successful!');
+        context.go('/home');
+      } else {
+        // Handle specific error messages
+        String errorMessage = result['message'] ?? 'Login failed';
+        
+        // Check for specific error types
+        if (errorMessage.toLowerCase().contains('unauthorised') || 
+            errorMessage.toLowerCase().contains('unauthorized')) {
+          _showError('Wrong email or password');
+        } else if (errorMessage.toLowerCase().contains('validation error')) {
+          _showError('Email must be in format: example@domain.com');
+        } else if (errorMessage.toLowerCase().contains('verify')) {
+          _showError('Please verify your email first');
+        } else {
+          _showError(errorMessage);
+        }
+      }
+    } catch (e) {
+      _showError('Login error: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+        _loadingMessage = '';
+      });
+    }
   }
 
   @override
@@ -64,7 +146,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const Spacer(),
 
-                  const TextInput(icon: Icons.email_outlined, hintText: "Email",),
+                  TextInput(
+                    icon: Icons.email_outlined,
+                    hintText: "Email",
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                  ),
                   const SizedBox(height: 16),
 
                   SizedBox(height: 54, width: double.infinity,
@@ -121,7 +208,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
 
                   const SizedBox(height: 30),
-                  AppButton( text: "Login",  onPressed: () => _onLogin(context),
+                  AppButton( text: _isLoading ? "Signing in..." : "Login",  onPressed: _isLoading ? null : () => _onLogin(context),
                     isPrimary: true,
                   ),
 
@@ -157,6 +244,24 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
+          // Loading overlay
+          if (_isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.6),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.green)),
+                    const SizedBox(height: 20),
+                    Text(
+                      _loadingMessage,
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );

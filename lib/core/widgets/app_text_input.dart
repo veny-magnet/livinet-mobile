@@ -5,6 +5,7 @@ class TextInput extends StatelessWidget {
   final String hintText;
   final TextEditingController? controller;
   final bool obscureText;
+  final TextInputType? keyboardType;
 
   const TextInput({
     super.key,
@@ -12,6 +13,7 @@ class TextInput extends StatelessWidget {
     required this.hintText,
     this.controller,
     this.obscureText = false,
+    this.keyboardType,
   });
 
   @override
@@ -24,6 +26,7 @@ class TextInput extends StatelessWidget {
       child: TextField(
         controller: controller,
         obscureText: obscureText,
+        keyboardType: keyboardType,
         decoration: InputDecoration(
           prefixIcon: Icon(icon, color: borderColor),
           hintText: hintText,
