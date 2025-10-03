@@ -4,12 +4,14 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 class RegistrationService {
-  static const String baseUrl = 'https://345a7c068173.ngrok-free.app/api/v1';
+  static const String baseUrl = 'https://c0f5cedd1ab2.ngrok-free.app/api/v1';
   static const String apiServer = 'LIVINET_API_SERVER';
   static const String apiKey = 'LIVINET_API_KEY';
-  
+
   // Complete registration
-  Future<Map<String, dynamic>> register(Map<String, dynamic> registrationData) async {
+  Future<Map<String, dynamic>> register(
+    Map<String, dynamic> registrationData,
+  ) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/client/registration'),
@@ -20,9 +22,9 @@ class RegistrationService {
         },
         body: jsonEncode(registrationData),
       );
-      
+
       Map<String, dynamic> responseData = jsonDecode(response.body);
-      
+
       if (response.statusCode == 200 && responseData['success'] == true) {
         return {
           'success': true,
@@ -34,10 +36,9 @@ class RegistrationService {
           'success': false,
           'message': responseData['message'] ?? 'Registration failed',
           'data': responseData['data'],
-          'errors': responseData['errors'], 
+          'errors': responseData['errors'],
         };
       }
-      
     } catch (e) {
       return {
         'success': false,
@@ -47,14 +48,14 @@ class RegistrationService {
       };
     }
   }
-  
+
   static int _userCounter = 0;
   String generateUserId() {
     final id = 'CR0050${_userCounter.toString().padLeft(2, '0')}';
     _userCounter++;
     return id;
   }
-  
+
   // Build registration data
   Map<String, dynamic> buildRegistrationData({
     required String username,
@@ -92,23 +93,24 @@ class RegistrationService {
       'fcm_token': fcmToken ?? 'TESTTTT-TOKEN',
     };
   }
-  
+
   // Validate registration data before sending
   Map<String, String> validateRegistrationData(Map<String, dynamic> data) {
     Map<String, String> errors = {};
-    
+
     // User ID
     if (data['user_id'] == null || data['user_id'].toString().trim().isEmpty) {
       errors['user_id'] = 'User ID is required';
     }
-    
+
     // Username
-    if (data['username'] == null || data['username'].toString().trim().isEmpty) {
+    if (data['username'] == null ||
+        data['username'].toString().trim().isEmpty) {
       errors['username'] = 'Username is required';
     } else if (data['username'].toString().trim().length < 3) {
       errors['username'] = 'Username must be at least 3 characters';
     }
-    
+
     // Phone
     String phone = data['phone']?.toString().trim() ?? '';
     if (phone.isEmpty) {
@@ -118,7 +120,7 @@ class RegistrationService {
     } else if (!RegExp(r'^[0-9]+$').hasMatch(phone)) {
       errors['phone'] = 'Phone number must contain only digits';
     }
-    
+
     // Email
     String email = data['email']?.toString().trim() ?? '';
     if (email.isEmpty) {
@@ -126,7 +128,7 @@ class RegistrationService {
     } else if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
       errors['email'] = 'Please enter a valid email address';
     }
-    
+
     // Password
     String password = data['password']?.toString() ?? '';
     if (password.isEmpty) {
@@ -134,12 +136,13 @@ class RegistrationService {
     } else if (password.length < 8 || password.length > 20) {
       errors['password'] = 'Password must be between 8-20 characters';
     }
-    
+
     // Address
-    if (data['address'] == null || data['address'].toString().trim().length < 5) {
+    if (data['address'] == null ||
+        data['address'].toString().trim().length < 5) {
       errors['address'] = 'Address must be at least 5 characters';
     }
-    
+
     // Location IDs
     if (data['city_id'] == null || data['city_id'] == 0) {
       errors['city_id'] = 'Please select a city';
@@ -150,32 +153,41 @@ class RegistrationService {
     if (data['area_id'] == null || data['area_id'] == 0) {
       errors['area_id'] = 'Please select an area';
     }
-    
+
     // Postcode
-    if (data['postcode'] == null || data['postcode'].toString().trim().isEmpty) {
+    if (data['postcode'] == null ||
+        data['postcode'].toString().trim().isEmpty) {
       errors['postcode'] = 'Postcode is required';
     }
-    
+
     // Identity card data
     if (data['identity_card'] == null) {
       errors['identity_card'] = 'Identity card data is required';
     } else {
       Map<String, dynamic> identityCard = data['identity_card'];
       List<String> requiredFields = [
-        'national_id_number', 'full_name', 'first_name', 'last_name',
-        'birth_place', 'birth_date', 'gender', 'address'
+        'national_id_number',
+        'full_name',
+        'first_name',
+        'last_name',
+        'birth_place',
+        'birth_date',
+        'gender',
+        'address',
       ];
-      
+
       for (String field in requiredFields) {
-        if (identityCard[field] == null || identityCard[field].toString().trim().isEmpty) {
-          errors['identity_card_$field'] = '${field.replaceAll('_', ' ')} is required in identity card';
+        if (identityCard[field] == null ||
+            identityCard[field].toString().trim().isEmpty) {
+          errors['identity_card_$field'] =
+              '${field.replaceAll('_', ' ')} is required in identity card';
         }
       }
     }
-    
+
     return errors;
   }
-  
+
   // Check if phone number exists
   Future<Map<String, dynamic>> checkPhoneExists(String phone) async {
     try {
@@ -188,22 +200,18 @@ class RegistrationService {
         },
         body: jsonEncode({'phone': phone}),
       );
-      
+
       Map<String, dynamic> responseData = jsonDecode(response.body);
-      
+
       return {
         'exists': responseData['exists'] ?? false,
         'message': responseData['message'] ?? 'Phone check completed',
       };
-      
     } catch (e) {
-      return {
-        'exists': false,
-        'message': 'Unable to check phone number',
-      };
+      return {'exists': false, 'message': 'Unable to check phone number'};
     }
   }
-  
+
   // Check if email exists
   Future<Map<String, dynamic>> checkEmailExists(String email) async {
     try {
@@ -216,19 +224,15 @@ class RegistrationService {
         },
         body: jsonEncode({'email': email}),
       );
-      
+
       Map<String, dynamic> responseData = jsonDecode(response.body);
-      
+
       return {
         'exists': responseData['exists'] ?? false,
         'message': responseData['message'] ?? 'Email check completed',
       };
-      
     } catch (e) {
-      return {
-        'exists': false,
-        'message': 'Unable to check email address',
-      };
+      return {'exists': false, 'message': 'Unable to check email address'};
     }
   }
 }
