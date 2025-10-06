@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 class RegistrationService {
-  static const String baseUrl = 'https://c0f5cedd1ab2.ngrok-free.app/api/v1';
+  static const String baseUrl = 'https://c1f3c63407b6.ngrok-free.app/api/v1';
   static const String apiServer = 'LIVINET_API_SERVER';
   static const String apiKey = 'LIVINET_API_KEY';
 

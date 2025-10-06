@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
 class KtpService {
-  static const String baseUrl = 'https://c0f5cedd1ab2.ngrok-free.app/api/v1';
+  static const String baseUrl = 'https://c1f3c63407b6.ngrok-free.app/api/v1';
 
   Future<Map<String, dynamic>> uploadAndProcessKtp({
     required String userId,

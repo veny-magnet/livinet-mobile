@@ -14,7 +14,7 @@ class ApiException implements Exception {
 }
 
 class BaseApiService {
-  static const String baseUrl = 'https://c0f5cedd1ab2.ngrok-free.app/api/v1';
+  static const String baseUrl = 'https://c1f3c63407b6.ngrok-free.app/api/v1';
 
   // These should be configured according to your Laravel API requirements
   static const String nameServer = 'livinet-mobile-app';
