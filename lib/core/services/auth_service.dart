@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
-  static const String baseUrl = 'https://c1f3c63407b6.ngrok-free.app/api/v1';
+  static const String baseUrl = 'https://b3fbc1baea87.ngrok-free.app/api/v1';
   static const String apiServer = 'LIVINET_API_SERVER';
   static const String apiKey = 'LIVINET_API_KEY_12345';
 

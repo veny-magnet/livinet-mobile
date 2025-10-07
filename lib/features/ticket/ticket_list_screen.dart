@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'make_ticket_screen.dart';
 
 class TicketListScreen extends StatefulWidget {
   const TicketListScreen({super.key});
@@ -29,25 +30,29 @@ class _TicketListScreenState extends State<TicketListScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         elevation: 0,
+        leadingWidth: 40,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Ticket',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            fontFamily: 'Open Sans',
+        title: const Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Ticket',
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'Open Sans',
+            ),
           ),
         ),
+        titleSpacing: 0,
       ),
       body: Column(
         children: [
-          // Notice Banner
           Container(
             width: double.infinity,
             margin: const EdgeInsets.all(16),
@@ -58,7 +63,11 @@ class _TicketListScreenState extends State<TicketListScreen>
             ),
             child: Row(
               children: [
-                Icon(Icons.close, color: Colors.grey.shade600, size: 20),
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.grey.shade600,
+                  size: 20,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -77,46 +86,46 @@ class _TicketListScreenState extends State<TicketListScreen>
           Align(
             alignment: Alignment.centerRight,
             child: Container(
-              margin: const EdgeInsets.only(
-                right: 16,
-                top: 4,
-                bottom: 12,
-              ), // Adjusted margins
+              margin: const EdgeInsets.only(right: 16, top: 4, bottom: 12),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: Colors.green,
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Make Ticket',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Open Sans',
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const MakeTicketScreen(),
                     ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(
-                    CupertinoIcons.tickets,
-                    color: Colors.white,
-                    size: 14,
-                  ),
-                ],
+                  );
+                },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Make Ticket',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Open Sans',
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(
+                      CupertinoIcons.tickets,
+                      color: Colors.white,
+                      size: 14,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
 
-          // Tab Bar with gradient indicator
           Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-            ),
             child: Column(
               children: [
                 TabBar(
@@ -141,10 +150,9 @@ class _TicketListScreenState extends State<TicketListScreen>
                     Tab(text: 'History'),
                   ],
                 ),
-                // Custom gradient indicator
                 Container(
                   height: 3,
-                  margin: const EdgeInsets.only(left: 16, right: 16, top: 2),
+                  margin: const EdgeInsets.only(top: 0),
                   child: TabBar(
                     controller: _tabController,
                     indicator: BoxDecoration(
@@ -164,7 +172,6 @@ class _TicketListScreenState extends State<TicketListScreen>
                     ],
                   ),
                 ),
-                const SizedBox(height: 6), // Reduced height
               ],
             ),
           ),
@@ -315,12 +322,8 @@ class _TicketListScreenState extends State<TicketListScreen>
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.arrow_forward_ios,
-              color: Colors.orange, // Both ongoing and history use orange
-              size: 16,
-            ),
+            const SizedBox(width: 12),
+            Icon(Icons.arrow_forward_ios, color: Colors.orange, size: 16),
           ],
         ),
       ],

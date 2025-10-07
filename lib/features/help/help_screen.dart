@@ -169,7 +169,7 @@ class HelpScreen extends StatelessWidget {
                   filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withOpacity(0.5),
                       borderRadius: BorderRadius.circular(24),
                     ),
                     child: TextField(
