@@ -29,12 +29,13 @@ class CustomGradientHeader extends StatelessWidget {
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 8),
+              // Minimal top spacing
+              const SizedBox(height: 2),
 
               // Title and optional action
               if (action != null)

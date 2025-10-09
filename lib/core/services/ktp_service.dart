@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
 class KtpService {
-  static const String baseUrl = 'https://b3fbc1baea87.ngrok-free.app/api/v1';
+  static const String baseUrl = 'https://4dc6fa6ed9ea.ngrok-free.app/api/v1';
 
   Future<Map<String, dynamic>> uploadAndProcessKtp({
     required String userId,
@@ -29,7 +29,7 @@ class KtpService {
       String fileName = imageFile.path.split('/').last;
       request.files.add(
         await http.MultipartFile.fromPath(
-          'ktp_image',
+          'image',
           imageFile.path,
           filename: fileName,
           contentType: MediaType('image', 'jpeg'),

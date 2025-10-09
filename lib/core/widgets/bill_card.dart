@@ -37,17 +37,17 @@ class BillCard extends StatelessWidget {
                 Text(
                   planName,
                   style: TextStyle(
-                    fontSize: 14, // Reduced font size
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: Colors.black.withOpacity(0.8),
                     fontFamily: 'Open Sans',
                   ),
                 ),
-                const SizedBox(height: 2), // Reduced spacing
+                const SizedBox(height: 2),
                 Text(
                   billLabel,
                   style: TextStyle(
-                    fontSize: 11, // Reduced font size
+                    fontSize: 11,
                     color: Colors.black.withOpacity(0.6),
                     fontFamily: 'Open Sans',
                   ),
@@ -76,21 +76,19 @@ class BillCard extends StatelessWidget {
                         foregroundColor: Colors.white,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            12,
-                          ), // Reduced radius
+                          borderRadius: BorderRadius.circular(24),
                         ),
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 16, // Reduced padding
-                          vertical: 8,
+                          horizontal: 32,
+                          vertical: 10,
                         ),
-                        minimumSize: const Size(60, 32), // Reduced size
+                        minimumSize: const Size(60, 32),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                       child: const Text(
                         'Pay',
                         style: TextStyle(
-                          fontSize: 12, // Reduced font size
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
                           fontFamily: 'Open Sans',
                         ),
@@ -99,13 +97,13 @@ class BillCard extends StatelessWidget {
                   ],
                 ),
 
-                const SizedBox(height: 8), // Reduced spacing
+                const SizedBox(height: 8),
                 Divider(
                   color: Colors.black.withOpacity(0.2),
                   height: 1,
                   thickness: 1,
                 ),
-                const SizedBox(height: 8), // Reduced spacing
+                const SizedBox(height: 8),
 
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -113,7 +111,7 @@ class BillCard extends StatelessWidget {
                     Text(
                       'Latest payment on:',
                       style: TextStyle(
-                        fontSize: 10, // Reduced font size
+                        fontSize: 10,
                         color: Colors.black.withOpacity(0.6),
                         fontFamily: 'Open Sans',
                       ),
@@ -121,7 +119,7 @@ class BillCard extends StatelessWidget {
                     Text(
                       lastPaymentDate,
                       style: TextStyle(
-                        fontSize: 10, // Reduced font size
+                        fontSize: 10,
                         color: Colors.black.withOpacity(0.8),
                         fontFamily: 'Open Sans',
                       ),

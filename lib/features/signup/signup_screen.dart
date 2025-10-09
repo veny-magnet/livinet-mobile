@@ -283,7 +283,11 @@ class _SignupScreenState extends State<SignupScreen> {
             try {
               final areas = await _locationService.getAreas(city.id);
               _areasCache[city.id] = areas;
+              print(
+                '🔍 Preloaded ${areas.length} areas for city: ${city.name} (ID: ${city.id})',
+              );
             } catch (e) {
+              print('❌ Failed to preload areas for city ${city.id}: $e');
               debugPrint('Failed to preload areas for city ${city.id}: $e');
             }
           }
@@ -306,11 +310,33 @@ class _SignupScreenState extends State<SignupScreen> {
     });
   }
 
-  void _updateAreasForCity(CityModel city) {
+  void _updateAreasForCity(CityModel city) async {
     setState(() {
       _currentAreas = _areasCache[city.id] ?? [];
       _selectedArea = null;
+      print('🔍 _currentAreas updated: ${_currentAreas.length} items');
     });
+
+    // If no cached areas, fetch from API directly
+    if (_currentAreas.isEmpty) {
+      try {
+        final areas = await _locationService.getAreas(city.id);
+        setState(() {
+          _areasCache[city.id] = areas;
+          _currentAreas = areas;
+        });
+
+        for (var area in areas) {
+          print('   - ${area.areaName}');
+        }
+      } catch (e) {
+        _showError('Failed to load areas for ${city.name}');
+      }
+    } else {
+      for (var area in _currentAreas) {
+        print('   - ${area.areaName}');
+      }
+    }
   }
 
   void _showError(String message) {
@@ -493,8 +519,11 @@ class _SignupScreenState extends State<SignupScreen> {
                                   ),
                                 )
                                 .toList(),
-                            onChanged: _selectedState == null
-                                ? (CityModel? val) {}
+                            onChanged:
+                                _selectedState == null || _currentCities.isEmpty
+                                ? (
+                                    CityModel? val,
+                                  ) {} // Empty function when disabled
                                 : (CityModel? val) {
                                     setState(() => _selectedCity = val);
                                     if (val != null) {
@@ -516,7 +545,8 @@ class _SignupScreenState extends State<SignupScreen> {
                                   ),
                                 )
                                 .toList(),
-                            onChanged: _selectedCity == null
+                            onChanged:
+                                _selectedCity == null || _currentAreas.isEmpty
                                 ? (AreaModel? val) {}
                                 : (AreaModel? val) {
                                     setState(() => _selectedArea = val);

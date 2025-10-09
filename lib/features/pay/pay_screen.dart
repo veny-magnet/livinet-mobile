@@ -4,13 +4,70 @@ import '../../core/widgets/app_bottom_navigation.dart';
 import '../../core/widgets/address_selector.dart';
 import '../../core/widgets/bill_card.dart';
 import '../../core/widgets/custom_gradient_header.dart';
+import '../../core/widgets/not_verified_widget.dart';
+import '../../core/services/user_profile_service.dart';
 import '../payment/payment_screen.dart';
 
-class PayScreen extends StatelessWidget {
+class PayScreen extends StatefulWidget {
   const PayScreen({super.key});
 
   @override
+  State<PayScreen> createState() => _PayScreenState();
+}
+
+class _PayScreenState extends State<PayScreen> {
+  String status = '';
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      const String defaultUserId = 'CR006000';
+      final result = await UserProfileService.instance.getUserProfile(
+        defaultUserId,
+      );
+
+      if (result['success'] == true && result['data'] != null) {
+        final data = result['data'];
+        setState(() {
+          status = data.status ?? '';
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          status = '';
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        status = '';
+        isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8F9FA),
+        body: const Center(child: CircularProgressIndicator()),
+        bottomNavigationBar: const AppBottomNavigation(currentRoute: '/pay'),
+      );
+    }
+
+    // Show NotVerifiedWidget if user is not verified
+    if (status == 'not_verified') {
+      return const NotVerifiedWidget(currentRoute: '/pay');
+    }
+
+    // Normal Pay screen for verified users
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       body: Column(
@@ -47,7 +104,6 @@ class PayScreen extends StatelessWidget {
             ],
           ),
 
-          // Fixed Payment History Title
           Container(
             width: double.infinity,
             color: const Color(0xFFF8F9FA),
@@ -63,7 +119,6 @@ class PayScreen extends StatelessWidget {
             ),
           ),
 
-          // Scrollable Payment History Content
           Expanded(
             child: SingleChildScrollView(
               child: Padding(

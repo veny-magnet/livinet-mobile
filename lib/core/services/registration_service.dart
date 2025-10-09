@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 class RegistrationService {
-  static const String baseUrl = 'https://b3fbc1baea87.ngrok-free.app/api/v1';
+  static const String baseUrl = 'https://4dc6fa6ed9ea.ngrok-free.app/api/v1';
   static const String apiServer = 'LIVINET_API_SERVER';
   static const String apiKey = 'LIVINET_API_KEY';
 
@@ -51,7 +51,7 @@ class RegistrationService {
 
   static int _userCounter = 0;
   String generateUserId() {
-    final id = 'CR0050${_userCounter.toString().padLeft(2, '0')}';
+    final id = 'CR0060${_userCounter.toString().padLeft(2, '0')}';
     _userCounter++;
     return id;
   }
@@ -85,9 +85,7 @@ class RegistrationService {
       'area_id': areaId,
       'postcode': postcode.trim(),
       'country': 'Indonesia',
-      'status': 'Inactive', // Will be activated after email verification
       'referral_code': referralCode?.trim(),
-      'points': 100, // Default points
       'ktp_path': ktpPath,
       'identity_card': identityCard,
       'fcm_token': fcmToken ?? 'TESTTTT-TOKEN',
