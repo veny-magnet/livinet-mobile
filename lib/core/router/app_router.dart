@@ -7,12 +7,16 @@ import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/signup/signup_screen.dart';
 import '../../features/forgotpass/forgotpass_screen.dart';
+import '../../features/pay/pay_screen.dart';
+import '../../features/products/products_screen.dart';
+import '../../features/help/help_screen.dart';
+import '../../features/profile/profile_screen.dart';
 
 CustomTransitionPage<void> _fadePage(GoRouterState state, Widget child) {
   return CustomTransitionPage<void>(
-    key: state.pageKey,                        
+    key: state.pageKey,
     child: child,
-    opaque: false,                            
+    opaque: false,
     transitionDuration: const Duration(milliseconds: 350),
     transitionsBuilder: (context, animation, secondary, child) =>
         FadeTransition(opacity: animation, child: child),
@@ -29,7 +33,8 @@ class AppRouter {
       ),
       GoRoute(
         path: '/onboarding',
-        pageBuilder: (context, state) => _fadePage(state, const OnboardingScreen()),
+        pageBuilder: (context, state) =>
+            _fadePage(state, const OnboardingScreen()),
       ),
       GoRoute(
         path: '/login',
@@ -41,11 +46,30 @@ class AppRouter {
       ),
       GoRoute(
         path: '/forgotpass',
-        pageBuilder: (context, state) => _fadePage(state, const ForgotPasswordScreen()),
+        pageBuilder: (context, state) =>
+            _fadePage(state, const ForgotPasswordScreen()),
       ),
       GoRoute(
         path: '/home',
         pageBuilder: (context, state) => _fadePage(state, const HomeScreen()),
+      ),
+      GoRoute(
+        path: '/pay',
+        pageBuilder: (context, state) => _fadePage(state, const PayScreen()),
+      ),
+      GoRoute(
+        path: '/products',
+        pageBuilder: (context, state) =>
+            _fadePage(state, const ProductsScreen()),
+      ),
+      GoRoute(
+        path: '/help',
+        pageBuilder: (context, state) => _fadePage(state, const HelpScreen()),
+      ),
+      GoRoute(
+        path: '/profile',
+        pageBuilder: (context, state) =>
+            _fadePage(state, const ProfileScreen()),
       ),
     ],
   );

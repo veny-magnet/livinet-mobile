@@ -14,8 +14,8 @@ class ApiException implements Exception {
 }
 
 class BaseApiService {
-  static const String baseUrl = 'https://345a7c068173.ngrok-free.app/api/v1';
-  
+  static const String baseUrl = 'https://276dccd11ccd.ngrok-free.app/api/v1';
+
   // These should be configured according to your Laravel API requirements
   static const String nameServer = 'livinet-mobile-app';
   static const String keyServer = 'your-api-key-here';
@@ -42,9 +42,9 @@ class BaseApiService {
     T Function(dynamic)? fromJson,
   }) async {
     try {
-      final uri = Uri.parse('$baseUrl$endpoint').replace(
-        queryParameters: queryParams,
-      );
+      final uri = Uri.parse(
+        '$baseUrl$endpoint',
+      ).replace(queryParameters: queryParams);
 
       final response = await http.get(
         uri,
@@ -89,7 +89,7 @@ class BaseApiService {
     T Function(dynamic)? fromJson,
   ) {
     final Map<String, dynamic> jsonResponse;
-    
+
     try {
       jsonResponse = jsonDecode(response.body) as Map<String, dynamic>;
     } catch (e) {

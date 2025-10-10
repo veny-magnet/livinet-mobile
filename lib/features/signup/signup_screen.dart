@@ -24,7 +24,7 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _obscurePassword = true;
   bool _agreeToTerms = false;
   bool _obscureConfirmPassword = true;
-  
+
   // Form controllers
   final _referralCodeController = TextEditingController();
   final _usernameController = TextEditingController();
@@ -34,32 +34,32 @@ class _SignupScreenState extends State<SignupScreen> {
   final _addressController = TextEditingController();
   final _postcodeController = TextEditingController();
   final _phoneController = TextEditingController();
-  
+
   // Services
   final LocationService _locationService = LocationService();
   final KtpService _ktpService = KtpService();
   final RegistrationService _registrationService = RegistrationService();
   final AuthService _authService = AuthService();
-  
+
   // Location data with caching
   List<StateModel> _states = [];
   Map<int, List<CityModel>> _citiesCache = {};
   Map<int, List<AreaModel>> _areasCache = {};
-  
+
   List<CityModel> _currentCities = [];
   List<AreaModel> _currentAreas = [];
-  
+
   // Selected values
   StateModel? _selectedState;
   CityModel? _selectedCity;
   AreaModel? _selectedArea;
-  
+
   // KTP data
   File? _ktpImage;
   String? _ktpPath;
   Map<String, dynamic>? _ocrData;
   String? _userId;
-  
+
   // UI states
   bool _isRegistering = false;
   String _loadingMessage = '';
@@ -67,45 +67,45 @@ class _SignupScreenState extends State<SignupScreen> {
   /// Main signup method - validates form, then processes KTP, then registers
   Future<void> _onSignup(BuildContext context) async {
     if (_isRegistering) return;
-    
+
     // Step 1: Validate basic form fields first
     if (!_validateBasicForm()) return;
-    
+
     setState(() {
       _isRegistering = true;
       _loadingMessage = 'Processing registration...';
     });
-    
+
     try {
       // Step 2: Check if KTP image is selected
       if (_ktpImage == null) {
         _showError('Please upload your KTP image first');
         return;
       }
-      
+
       // Step 3: Process KTP
       setState(() => _loadingMessage = 'Registration Process');
-      
+
       // Generate user ID if not exists
       _userId ??= _registrationService.generateUserId();
-      
+
       final ktpResult = await _ktpService.uploadAndProcessKtp(
         userId: _userId!,
         imageFile: _ktpImage!,
       );
-      
+
       if (!ktpResult['success']) {
         _showError(ktpResult['message'] ?? 'Failed to process KTP');
         return;
       }
-      
+
       // Save KTP data
       _ktpPath = ktpResult['data']['ktp_path'];
       _ocrData = ktpResult['data']['identity_card'];
-      
+
       // Step 4: Proceed with registration
       setState(() => _loadingMessage = 'Creating your account...');
-      
+
       // Get FCM token for push notifications
       String? fcmToken;
       try {
@@ -114,7 +114,7 @@ class _SignupScreenState extends State<SignupScreen> {
         print('Failed to get FCM token: $e');
         // Continue without FCM token - it's optional
       }
-      
+
       // Build registration data
       final registrationData = _registrationService.buildRegistrationData(
         username: _usernameController.text,
@@ -132,21 +132,25 @@ class _SignupScreenState extends State<SignupScreen> {
         userId: _userId,
         fcmToken: fcmToken,
       );
-      
+
       // Validate registration data
-      final errors = _registrationService.validateRegistrationData(registrationData);
+      final errors = _registrationService.validateRegistrationData(
+        registrationData,
+      );
       if (errors.isNotEmpty) {
         _showError(errors.values.first);
         return;
       }
-      
+
       // Register user
       final result = await _registrationService.register(registrationData);
-      
+
       if (result['success']) {
         setState(() => _loadingMessage = 'Sending verification email...');
         // Send email verification
-        await _authService.sendEmailVerification(userId: registrationData['user_id']);
+        await _authService.sendEmailVerification(
+          userId: registrationData['user_id'],
+        );
         // Show dialog for email verification
         showDialog(
           context: context,
@@ -168,7 +172,6 @@ class _SignupScreenState extends State<SignupScreen> {
       } else {
         _showError(result['message'] ?? 'Registration failed');
       }
-      
     } catch (e) {
       _showError('Error: $e');
     } finally {
@@ -181,66 +184,67 @@ class _SignupScreenState extends State<SignupScreen> {
 
   /// Validate basic form fields (without KTP)
   bool _validateBasicForm() {
-    if (_referralCodeController.text.isNotEmpty && _referralCodeController.text.length < 3) {
+    if (_referralCodeController.text.isNotEmpty &&
+        _referralCodeController.text.length < 3) {
       _showError('Referral code must be at least 3 characters');
       return false;
     }
-    
+
     if (_usernameController.text.trim().isEmpty) {
       _showError('Username is required');
       return false;
     }
-    
+
     if (_emailController.text.trim().isEmpty) {
       _showError('Email is required');
       return false;
     }
-    
+
     if (_phoneController.text.trim().isEmpty) {
       _showError('Phone number is required');
       return false;
     }
-    
+
     if (_passwordController.text.isEmpty) {
       _showError('Password is required');
       return false;
     }
-    
+
     if (_confirmPasswordController.text != _passwordController.text) {
       _showError('Passwords do not match');
       return false;
     }
-    
+
     if (_selectedState == null) {
       _showError('Please select a province');
       return false;
     }
-    
+
     if (_selectedCity == null) {
       _showError('Please select a city');
       return false;
     }
-    
+
     if (_selectedArea == null) {
       _showError('Please select an area');
       return false;
     }
-    
+
     if (_addressController.text.trim().isEmpty) {
       _showError('Address is required');
       return false;
     }
-    
+
     if (_postcodeController.text.trim().isEmpty) {
       _showError('Postcode is required');
       return false;
     }
-    
+
     if (!_agreeToTerms) {
       _showError('Please agree to terms and conditions');
       return false;
     }
-    
+
     return true;
   }
 
@@ -269,17 +273,21 @@ class _SignupScreenState extends State<SignupScreen> {
       // Load states first
       _states = await _locationService.getStates();
       if (mounted) setState(() {});
-      
+
       for (final state in _states) {
         try {
           final cities = await _locationService.getCities(state.id);
           _citiesCache[state.id] = cities;
-          
+
           for (final city in cities) {
             try {
               final areas = await _locationService.getAreas(city.id);
               _areasCache[city.id] = areas;
+              print(
+                '🔍 Preloaded ${areas.length} areas for city: ${city.name} (ID: ${city.id})',
+              );
             } catch (e) {
+              print('❌ Failed to preload areas for city ${city.id}: $e');
               debugPrint('Failed to preload areas for city ${city.id}: $e');
             }
           }
@@ -302,11 +310,33 @@ class _SignupScreenState extends State<SignupScreen> {
     });
   }
 
-  void _updateAreasForCity(CityModel city) {
+  void _updateAreasForCity(CityModel city) async {
     setState(() {
       _currentAreas = _areasCache[city.id] ?? [];
       _selectedArea = null;
+      print('🔍 _currentAreas updated: ${_currentAreas.length} items');
     });
+
+    // If no cached areas, fetch from API directly
+    if (_currentAreas.isEmpty) {
+      try {
+        final areas = await _locationService.getAreas(city.id);
+        setState(() {
+          _areasCache[city.id] = areas;
+          _currentAreas = areas;
+        });
+
+        for (var area in areas) {
+          print('   - ${area.areaName}');
+        }
+      } catch (e) {
+        _showError('Failed to load areas for ${city.name}');
+      }
+    } else {
+      for (var area in _currentAreas) {
+        print('   - ${area.areaName}');
+      }
+    }
   }
 
   void _showError(String message) {
@@ -349,7 +379,10 @@ class _SignupScreenState extends State<SignupScreen> {
       resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
-          Positioned( top: -30, left: 0, right: 0,
+          Positioned(
+            top: -30,
+            left: 0,
+            right: 0,
             child: Image.asset(
               "assets/images/top_gradient.png",
               fit: BoxFit.cover,
@@ -357,7 +390,10 @@ class _SignupScreenState extends State<SignupScreen> {
               height: screenHeight * 0.35,
             ),
           ),
-          Positioned( bottom: -30, left: 0, right: 0,
+          Positioned(
+            bottom: -30,
+            left: 0,
+            right: 0,
             child: Image.asset(
               "assets/images/bottom_gradient.png",
               fit: BoxFit.cover,
@@ -369,12 +405,18 @@ class _SignupScreenState extends State<SignupScreen> {
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(20.0),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: 40),
                   const Text(
                     "Get Started!",
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.green,),textAlign: TextAlign.left,
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.green,
+                    ),
+                    textAlign: TextAlign.left,
                   ),
                   const SizedBox(height: 10),
                   Text(
@@ -423,7 +465,9 @@ class _SignupScreenState extends State<SignupScreen> {
                             c: c,
                             obscure: _obscurePassword,
                             onToggle: () {
-                              setState(() => _obscurePassword = !_obscurePassword);
+                              setState(
+                                () => _obscurePassword = !_obscurePassword,
+                              );
                             },
                           ),
                           const SizedBox(height: 16),
@@ -435,8 +479,10 @@ class _SignupScreenState extends State<SignupScreen> {
                             c: c,
                             obscure: _obscureConfirmPassword,
                             onToggle: () {
-                              setState(() =>
-                                 _obscureConfirmPassword = !_obscureConfirmPassword);
+                              setState(
+                                () => _obscureConfirmPassword =
+                                    !_obscureConfirmPassword,
+                              );
                             },
                           ),
                           const SizedBox(height: 16),
@@ -445,10 +491,12 @@ class _SignupScreenState extends State<SignupScreen> {
                             hintText: "Select Province",
                             value: _selectedState,
                             items: _states
-                                .map((state) => DropdownMenuItem(
-                                      value: state,
-                                      child: Text(state.name),
-                                    ))
+                                .map(
+                                  (state) => DropdownMenuItem(
+                                    value: state,
+                                    child: Text(state.name),
+                                  ),
+                                )
                                 .toList(),
                             onChanged: (StateModel? val) {
                               setState(() => _selectedState = val);
@@ -464,13 +512,18 @@ class _SignupScreenState extends State<SignupScreen> {
                             hintText: "Select City",
                             value: _selectedCity,
                             items: _currentCities
-                                .map((city) => DropdownMenuItem(
-                                      value: city,
-                                      child: Text(city.name),
-                                    ))
+                                .map(
+                                  (city) => DropdownMenuItem(
+                                    value: city,
+                                    child: Text(city.name),
+                                  ),
+                                )
                                 .toList(),
-                            onChanged: _selectedState == null
-                                ? (CityModel? val) {} 
+                            onChanged:
+                                _selectedState == null || _currentCities.isEmpty
+                                ? (
+                                    CityModel? val,
+                                  ) {} // Empty function when disabled
                                 : (CityModel? val) {
                                     setState(() => _selectedCity = val);
                                     if (val != null) {
@@ -485,12 +538,15 @@ class _SignupScreenState extends State<SignupScreen> {
                             hintText: "Select Area",
                             value: _selectedArea,
                             items: _currentAreas
-                                .map((area) => DropdownMenuItem(
-                                      value: area,
-                                      child: Text(area.areaName),
-                                    ))
+                                .map(
+                                  (area) => DropdownMenuItem(
+                                    value: area,
+                                    child: Text(area.areaName),
+                                  ),
+                                )
                                 .toList(),
-                            onChanged: _selectedCity == null
+                            onChanged:
+                                _selectedCity == null || _currentAreas.isEmpty
                                 ? (AreaModel? val) {}
                                 : (AreaModel? val) {
                                     setState(() => _selectedArea = val);
@@ -522,15 +578,25 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                           const SizedBox(height: 10),
 
-                          Row(crossAxisAlignment: CrossAxisAlignment.center,
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              Checkbox(value: _agreeToTerms, activeColor: Colors.green, checkColor: Colors.white,
-                              side: BorderSide(
-                                color: Theme.of(context).colorScheme.onSurface,
-                                width: 1.2,
-                              ),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
-                                fillColor: MaterialStateProperty.resolveWith((states) {
+                              Checkbox(
+                                value: _agreeToTerms,
+                                activeColor: Colors.green,
+                                checkColor: Colors.white,
+                                side: BorderSide(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
+                                  width: 1.2,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                                fillColor: MaterialStateProperty.resolveWith((
+                                  states,
+                                ) {
                                   if (states.contains(MaterialState.selected)) {
                                     return Colors.green;
                                   }
@@ -544,11 +610,19 @@ class _SignupScreenState extends State<SignupScreen> {
                                 child: RichText(
                                   text: TextSpan(
                                     text: "I agree to the ",
-                                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface,fontSize: 14,),
+                                    style: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface,
+                                      fontSize: 14,
+                                    ),
                                     children: [
                                       TextSpan(
                                         text: "terms and conditions",
-                                        style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600,),
+                                        style: const TextStyle(
+                                          color: Colors.green,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -560,7 +634,9 @@ class _SignupScreenState extends State<SignupScreen> {
 
                           AppButton(
                             text: _isRegistering ? "Processing..." : "Sign Up",
-                            onPressed: _isRegistering ? null : () => _onSignup(context),
+                            onPressed: _isRegistering
+                                ? null
+                                : () => _onSignup(context),
                             isPrimary: true,
                           ),
                         ],
@@ -569,17 +645,28 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
 
                   const SizedBox(height: 10),
-                  Row( mainAxisAlignment: MainAxisAlignment.center,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
                         "Already have an account? ",
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.normal, color: c.onSurface,),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.normal,
+                          color: c.onSurface,
+                        ),
                       ),
                       GestureDetector(
-                        onTap: () { debugPrint("Login tapped"); context.go('/login');},
+                        onTap: () {
+                          debugPrint("Login tapped");
+                          context.go('/login');
+                        },
                         child: const Text(
                           "Login",
-                          style: TextStyle( color: Colors.green, fontWeight: FontWeight.w900,),
+                          style: TextStyle(
+                            color: Colors.green,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
                     ],
@@ -589,7 +676,7 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
             ),
           ),
-          
+
           // Loading Overlay
           if (_isRegistering)
             Container(
@@ -653,7 +740,10 @@ class _SignupScreenState extends State<SignupScreen> {
           prefixIcon: Icon(Icons.lock_outline, color: borderColor),
           hintText: hint,
           hintStyle: TextStyle(color: borderColor),
-          contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 0,
+            horizontal: 16,
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(25),
             borderSide: BorderSide(color: borderColor),

@@ -4,10 +4,10 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
-  static const String baseUrl = 'https://345a7c068173.ngrok-free.app/api/v1';
+  static const String baseUrl = 'https://276dccd11ccd.ngrok-free.app/api/v1';
   static const String apiServer = 'LIVINET_API_SERVER';
   static const String apiKey = 'LIVINET_API_KEY_12345';
-  
+
   // Login method
   Future<Map<String, dynamic>> login({
     required String email,
@@ -32,13 +32,13 @@ class AuthService {
           'remember_me': rememberMe,
         }),
       );
-      
+
       Map<String, dynamic> responseData = jsonDecode(response.body);
-      
+
       if (response.statusCode == 200 && responseData['success'] == true) {
         // Save token and user data
         await _saveUserSession(responseData['data']);
-        
+
         return {
           'success': true,
           'data': responseData['data'],
@@ -51,7 +51,6 @@ class AuthService {
           'data': null,
         };
       }
-      
     } catch (e) {
       return {
         'success': false,
@@ -60,7 +59,7 @@ class AuthService {
       };
     }
   }
-  
+
   // Send email verification
   Future<Map<String, dynamic>> sendEmailVerification({
     required String userId,
@@ -79,15 +78,16 @@ class AuthService {
           'user_id': userId,
         }),
       );
-      
+
       Map<String, dynamic> responseData = jsonDecode(response.body);
-      
+
       return {
-        'success': response.statusCode == 200 && responseData['success'] == true,
-        'message': responseData['message'] ?? 'Email verification request processed',
+        'success':
+            response.statusCode == 200 && responseData['success'] == true,
+        'message':
+            responseData['message'] ?? 'Email verification request processed',
         'data': responseData['data'],
       };
-      
     } catch (e) {
       return {
         'success': false,
@@ -96,19 +96,18 @@ class AuthService {
       };
     }
   }
-  
+
   // Logout
   Future<Map<String, dynamic>> logout() async {
     try {
       // Clear local session
       await _clearUserSession();
-      
+
       return {
         'success': true,
         'message': 'Logged out successfully',
         'data': null,
       };
-      
     } catch (e) {
       return {
         'success': false,
@@ -117,7 +116,7 @@ class AuthService {
       };
     }
   }
-  
+
   // Check if user is logged in
   Future<bool> isLoggedIn() async {
     try {
@@ -128,13 +127,13 @@ class AuthService {
       return false;
     }
   }
-  
+
   // Get current user data
   Future<Map<String, dynamic>?> getCurrentUser() async {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       String? userDataJson = prefs.getString('user_data');
-      
+
       if (userDataJson != null) {
         return jsonDecode(userDataJson);
       }
@@ -143,7 +142,7 @@ class AuthService {
       return null;
     }
   }
-  
+
   // Get auth token
   Future<String?> getAuthToken() async {
     try {
@@ -153,23 +152,23 @@ class AuthService {
       return null;
     }
   }
-  
+
   // Private method to save user session
   Future<void> _saveUserSession(Map<String, dynamic> userData) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    
+
     // Save token
     if (userData['token'] != null) {
       await prefs.setString('auth_token', userData['token']);
     }
-    
+
     // Save user data
     await prefs.setString('user_data', jsonEncode(userData));
-    
+
     // Save login timestamp
     await prefs.setString('login_time', DateTime.now().toIso8601String());
   }
-  
+
   // Private method to clear user session
   Future<void> _clearUserSession() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
