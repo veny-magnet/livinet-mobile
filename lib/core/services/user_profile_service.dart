@@ -4,7 +4,7 @@ import '../models/user_profile.dart';
 import 'auth_service.dart';
 
 class UserProfileService {
-  static const String baseUrl = 'https://4dc6fa6ed9ea.ngrok-free.app/api/v1';
+  static const String baseUrl = 'https://276dccd11ccd.ngrok-free.app/api/v1';
 
   static UserProfileService? _instance;
   UserProfile? _cachedProfile;

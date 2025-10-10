@@ -166,8 +166,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   // Show AddressSelector and BillCard only if user is verified
                   if (status == 'verified') ...[
-                    const AddressSelector(
-                      address: 'Apartemen Mediterania Lt. 31 Unit 32AN',
+                    AddressSelector(
+                      userId: userId.isNotEmpty ? userId : 'CR006000',
+                      defaultAddress: 'Apartemen Mediterania Lt. 31 Unit 32AN',
+                      onAddressSelected: (selectedAddress) {
+                        print(
+                          'Address selected: ${selectedAddress.formattedAddress}',
+                        );
+                        // TODO: Update bill or other components based on selected address
+                      },
                     ),
 
                     const SizedBox(height: 16),

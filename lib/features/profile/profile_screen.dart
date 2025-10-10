@@ -4,6 +4,9 @@ import '../../core/widgets/profile_header.dart';
 import '../../core/widgets/profile_menu_section.dart';
 import '../../core/widgets/not_verified_widget.dart';
 import '../../core/services/user_profile_service.dart';
+import '../../core/services/auth_service.dart';
+import 'edit_profile_screen.dart';
+import 'address_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -15,6 +18,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   String status = '';
   bool isLoading = true;
+  String? userId;
 
   @override
   void initState() {
@@ -24,26 +28,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadUserProfile() async {
     try {
-      const String defaultUserId = 'CR006000';
+      // First try to get cached profile to get user ID
+      final cachedProfile = UserProfileService.instance.getCachedProfile();
+
+      String? userIdToUse;
+
+      if (cachedProfile != null) {
+        userIdToUse = cachedProfile.userId;
+      } else {
+        // Get user ID from auth service
+        final authService = AuthService();
+        final currentUser = await authService.getCurrentUser();
+
+        if (currentUser != null && currentUser['user_id'] != null) {
+          userIdToUse = currentUser['user_id'];
+        } else {
+          // If no user found in auth, user needs to login
+          setState(() {
+            status = 'not_logged_in';
+            isLoading = false;
+          });
+          return;
+        }
+      }
+
       final result = await UserProfileService.instance.getUserProfile(
-        defaultUserId,
+        userIdToUse!,
       );
 
       if (result['success'] == true && result['data'] != null) {
         final data = result['data'];
         setState(() {
           status = data.status ?? '';
+          userId = data.userId ?? userIdToUse;
           isLoading = false;
         });
       } else {
         setState(() {
           status = '';
+          userId = userIdToUse;
           isLoading = false;
         });
       }
     } catch (e) {
       setState(() {
-        status = '';
+        status = 'error';
+        userId = null;
         isLoading = false;
       });
     }
@@ -68,8 +98,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     // Account menu items
     final accountMenuItems = [
-      {'icon': Icons.location_on_outlined, 'title': 'Address', 'onTap': null},
-      {'icon': Icons.person_outline, 'title': 'Edit Profile', 'onTap': null},
+      {
+        'icon': Icons.location_on_outlined,
+        'title': 'Address',
+        'onTap': () {
+          if (userId != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AddressScreen(userId: userId!),
+              ),
+            );
+          }
+        },
+      },
+      {
+        'icon': Icons.person_outline,
+        'title': 'Edit Profile',
+        'onTap': () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+          );
+        },
+      },
       {'icon': Icons.lock_outline, 'title': 'Change Password', 'onTap': null},
       {'icon': Icons.emoji_events_outlined, 'title': 'Points', 'onTap': null},
     ];

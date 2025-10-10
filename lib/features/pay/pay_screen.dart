@@ -76,7 +76,8 @@ class _PayScreenState extends State<PayScreen> {
             title: 'Pay',
             children: [
               AddressSelector(
-                address: 'Apartemen Mediterania Lt. 31 Unit 32AN',
+                userId: 'CR006000',
+                defaultAddress: 'Apartemen Mediterania Lt. 31 Unit 32AN',
                 onTap: () {
                   // Handle address selection
                 },

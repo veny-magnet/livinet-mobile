@@ -1,18 +1,26 @@
 import 'package:flutter/material.dart';
+import '../services/product_service.dart';
 
 class ProductCard extends StatelessWidget {
-  final String imageUrl;
-  final String title;
-  final String price;
+  final Product? product;
+  final String? imageUrl;
+  final String? title;
+  final String? price;
   final VoidCallback? onTap;
 
   const ProductCard({
     super.key,
-    required this.imageUrl,
-    required this.title,
-    required this.price,
+    this.product,
+    this.imageUrl,
+    this.title,
+    this.price,
     this.onTap,
   });
+
+  // Helper getters to prioritize product data over individual params
+  String get displayTitle => product?.name ?? title ?? '';
+  String get displayPrice => product?.formattedPrice ?? price ?? '';
+  String get displayImageUrl => imageUrl ?? '';
 
   @override
   Widget build(BuildContext context) {
@@ -43,11 +51,11 @@ class ProductCard extends StatelessWidget {
                 color: const Color(0xFFD9D9D9),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: imageUrl.isNotEmpty
+              child: displayImageUrl.isNotEmpty
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(10),
                       child: Image.network(
-                        imageUrl,
+                        displayImageUrl,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
                           return const Center(
@@ -69,7 +77,7 @@ class ProductCard extends StatelessWidget {
 
             // Title
             Text(
-              title,
+              displayTitle,
               style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -98,7 +106,7 @@ class ProductCard extends StatelessWidget {
                 // Price
                 Expanded(
                   child: Text(
-                    price,
+                    displayPrice,
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,

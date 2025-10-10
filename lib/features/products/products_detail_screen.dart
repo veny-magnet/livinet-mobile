@@ -1,19 +1,126 @@
 import 'package:flutter/material.dart';
+import '../../core/services/product_service.dart';
+import '../../core/services/product_detail_service.dart';
+import '../../core/services/address_service.dart';
 
-class ProductsDetailScreen extends StatelessWidget {
-  final String title;
-  final String price;
-  final String location;
+class ProductsDetailScreen extends StatefulWidget {
+  final String? title;
+  final String? price;
+  final String? location;
+  final Product? product;
 
   const ProductsDetailScreen({
     super.key,
-    required this.title,
-    required this.price,
-    required this.location,
+    this.title,
+    this.price,
+    this.location,
+    this.product,
   });
 
   @override
+  State<ProductsDetailScreen> createState() => _ProductsDetailScreenState();
+}
+
+class _ProductsDetailScreenState extends State<ProductsDetailScreen> {
+  bool isLoading = true;
+  String errorMessage = '';
+  ProductDetail? productDetail;
+  String locationText = '';
+
+  // Get display values
+  String get displayTitle => widget.product?.name ?? widget.title ?? '';
+  String get displayPrice =>
+      widget.product?.formattedPrice ?? widget.price ?? '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = '';
+    });
+
+    try {
+      // Load location from address service
+      await _loadLocation();
+
+      // Load product detail if we have product data
+      if (widget.product != null) {
+        await _loadProductDetail(widget.product!.pid);
+      }
+
+      setState(() {
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+        errorMessage = 'Error loading data: $e';
+      });
+    }
+  }
+
+  Future<void> _loadLocation() async {
+    try {
+      const String defaultUserId = 'CR006000';
+      final result = await AddressService.instance.getUserAddresses(
+        defaultUserId,
+      );
+
+      if (result['success'] == true && result['data'] != null) {
+        final List<UserAddress> addresses = result['data'] as List<UserAddress>;
+        if (addresses.isNotEmpty) {
+          final address = addresses.first;
+          setState(() {
+            locationText =
+                'Available in ${address.areaName}, ${address.cityName}, ${address.stateName}';
+          });
+        } else {
+          setState(() {
+            locationText = widget.location ?? 'Location not available';
+          });
+        }
+      } else {
+        setState(() {
+          locationText = widget.location ?? 'Location not available';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        locationText = widget.location ?? 'Location not available';
+      });
+    }
+  }
+
+  Future<void> _loadProductDetail(int productId) async {
+    try {
+      final result = await ProductDetailService.instance.getProductDetail(
+        productId: productId,
+      );
+
+      if (result['success'] == true && result['data'] != null) {
+        setState(() {
+          productDetail = result['data'] as ProductDetail;
+        });
+      }
+    } catch (e) {
+      print('Error loading product detail: $e');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8F9FA),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       body: Column(
@@ -62,7 +169,7 @@ class ProductsDetailScreen extends StatelessWidget {
 
                     // Product title
                     Text(
-                      title,
+                      displayTitle,
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -75,7 +182,7 @@ class ProductsDetailScreen extends StatelessWidget {
 
                     // Price
                     Text(
-                      price,
+                      displayPrice,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
@@ -105,12 +212,14 @@ class ProductsDetailScreen extends StatelessWidget {
                         size: 20,
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        location,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.black,
-                          fontFamily: 'Open Sans',
+                      Expanded(
+                        child: Text(
+                          locationText,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.black,
+                            fontFamily: 'Open Sans',
+                          ),
                         ),
                       ),
                     ],
@@ -131,42 +240,45 @@ class ProductsDetailScreen extends StatelessWidget {
 
                   const SizedBox(height: 12),
 
-                  // Description text
-                  const Expanded(
+                  // Description text or error
+                  Expanded(
                     child: SingleChildScrollView(
-                      child: Column(
-                        children: [
-                          Text(
-                            'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
-                            style: TextStyle(
-                              fontSize: 14,
-                              height: 1.5,
-                              color: Colors.black54,
-                              fontFamily: 'Open Sans',
+                      child: errorMessage.isNotEmpty
+                          ? Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.error_outline,
+                                  size: 48,
+                                  color: Colors.red.withOpacity(0.7),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  errorMessage,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.red,
+                                    fontFamily: 'Open Sans',
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton(
+                                  onPressed: _loadData,
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            )
+                          : Text(
+                              productDetail?.description ??
+                                  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                height: 1.5,
+                                color: Colors.black54,
+                                fontFamily: 'Open Sans',
+                              ),
                             ),
-                          ),
-                          SizedBox(height: 16),
-                          Text(
-                            'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
-                            style: TextStyle(
-                              fontSize: 14,
-                              height: 1.5,
-                              color: Colors.black54,
-                              fontFamily: 'Open Sans',
-                            ),
-                          ),
-                          SizedBox(height: 16),
-                          Text(
-                            'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
-                            style: TextStyle(
-                              fontSize: 14,
-                              height: 1.5,
-                              color: Colors.black54,
-                              fontFamily: 'Open Sans',
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
                   ),
 
