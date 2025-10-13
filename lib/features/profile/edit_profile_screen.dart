@@ -144,411 +144,472 @@ class _EditProfileScreenState extends State<EditProfileScreen>
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return Scaffold(
-        backgroundColor: const Color(0xFFF8F9FA),
-        body: const Center(child: CircularProgressIndicator()),
+      return const Scaffold(
+        backgroundColor: Color(0xFFF8F9FA),
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: const Icon(
-                      Icons.arrow_back_ios,
-                      color: Colors.black,
-                      size: 20,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF4CB04C), Color(0xFFF8D86E)],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Custom AppBar with Gradient Header Style
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(
+                        Icons.arrow_back_ios,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      splashRadius: 24,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Edit Profile',
+                      style: TextStyle(
+                        fontFamily: 'Open Sans',
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Profile Photo
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey.shade300,
+                  border: Border.all(color: Colors.white, width: 4),
+                ),
+                child: ClipOval(
+                  child: profileImageUrl.isNotEmpty
+                      ? Image.network(
+                          profileImageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Icon(
+                              Icons.person,
+                              size: 50,
+                              color: Colors.grey,
+                            );
+                          },
+                        )
+                      : const Icon(Icons.person, size: 50, color: Colors.grey),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Main Content
+              Expanded(
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF8F9FA),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(24),
+                      topRight: Radius.circular(24),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Edit Profile',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
-                      fontFamily: 'Open Sans',
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 16),
 
-            // Profile Photo
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.grey.shade300,
-                border: Border.all(color: Colors.white, width: 4),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: ClipOval(
-                child: profileImageUrl.isNotEmpty
-                    ? Image.network(
-                        profileImageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(
-                            Icons.person,
-                            size: 50,
-                            color: Colors.grey,
-                          );
-                        },
-                      )
-                    : const Icon(Icons.person, size: 50, color: Colors.grey),
-              ),
-            ),
+                      // Tab Bar
+                      Column(
+                        children: [
+                          TabBar(
+                            controller: _tabController,
+                            indicator: const BoxDecoration(
+                              color: Colors.transparent,
+                            ),
+                            indicatorColor: Colors.transparent,
+                            dividerColor: Colors.transparent,
+                            labelColor: Colors.green,
+                            unselectedLabelColor: Colors.grey,
+                            labelStyle: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Open Sans',
+                            ),
+                            unselectedLabelStyle: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              fontFamily: 'Open Sans',
+                            ),
+                            tabs: const [
+                              Tab(text: 'Profile'),
+                              Tab(text: 'KTP'),
+                            ],
+                          ),
+                          Container(
+                            height: 3,
+                            margin: const EdgeInsets.only(top: 0),
+                            child: TabBar(
+                              controller: _tabController,
+                              indicator: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFF4CB04C),
+                                    Color(0xFFF8D86E),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                              indicatorColor: Colors.transparent,
+                              dividerColor: Colors.transparent,
+                              labelColor: Colors.transparent,
+                              unselectedLabelColor: Colors.transparent,
+                              indicatorSize: TabBarIndicatorSize.tab,
+                              tabs: const [
+                                Tab(text: 'Profile'),
+                                Tab(text: 'KTP'),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
 
-            const SizedBox(height: 20),
+                      // Tab Bar View
+                      Expanded(
+                        child: TabBarView(
+                          controller: _tabController,
+                          children: [
+                            // Profile Tab
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    const SizedBox(height: 16),
 
-            // Tab Bar
-            Container(
-              child: Column(
-                children: [
-                  TabBar(
-                    controller: _tabController,
-                    indicator: const BoxDecoration(color: Colors.transparent),
-                    indicatorColor: Colors.transparent,
-                    dividerColor: Colors.transparent,
-                    labelColor: Colors.green,
-                    unselectedLabelColor: Colors.grey.shade600,
-                    labelStyle: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Open Sans',
-                    ),
-                    unselectedLabelStyle: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      fontFamily: 'Open Sans',
-                    ),
-                    tabs: const [
-                      Tab(text: 'Profile'),
-                      Tab(text: 'KTP'),
+                                    const Text(
+                                      'User ID',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.black87,
+                                        fontFamily: 'Open Sans',
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    _buildTextField(
+                                      icon: Icons.badge_outlined,
+                                      hintText: "User ID",
+                                      controller: _userIdController,
+                                      enabled: false,
+                                    ),
+                                    const SizedBox(height: 16),
+
+                                    const Text(
+                                      'User Name',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.black87,
+                                        fontFamily: 'Open Sans',
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    _buildTextField(
+                                      icon: Icons.person_outline,
+                                      hintText: "Username",
+                                      controller: _usernameController,
+                                    ),
+                                    const SizedBox(height: 16),
+
+                                    const Text(
+                                      'Phone',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.black87,
+                                        fontFamily: 'Open Sans',
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    _buildTextField(
+                                      icon: Icons.phone_outlined,
+                                      hintText: "Phone Number",
+                                      controller: _phoneController,
+                                      keyboardType: TextInputType.phone,
+                                    ),
+                                    const SizedBox(height: 16),
+
+                                    const Text(
+                                      'Email',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.black87,
+                                        fontFamily: 'Open Sans',
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    _buildTextField(
+                                      icon: Icons.email_outlined,
+                                      hintText: "Email",
+                                      controller: _emailController,
+                                      keyboardType: TextInputType.emailAddress,
+                                    ),
+                                    const SizedBox(height: 16),
+
+                                    const Text(
+                                      'Country',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.black87,
+                                        fontFamily: 'Open Sans',
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    _buildTextField(
+                                      icon: Icons.public_outlined,
+                                      hintText: "Country",
+                                      controller: _countryController,
+                                    ),
+                                    const SizedBox(height: 16),
+
+                                    Text(
+                                      'Status',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color:
+                                            _statusController.text == 'Verified'
+                                            ? Colors.blue
+                                            : Colors.red,
+                                        fontFamily: 'Open Sans',
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    _buildStatusField(),
+                                    const SizedBox(height: 32),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            // KTP Tab
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    const SizedBox(height: 16),
+
+                                    _buildKTPField(
+                                      'Province',
+                                      _provinceController,
+                                      Icons.location_city_outlined,
+                                    ),
+                                    _buildKTPField(
+                                      'City',
+                                      _cityController,
+                                      Icons.location_on_outlined,
+                                    ),
+                                    _buildKTPField(
+                                      'National ID Number',
+                                      _nationalIdController,
+                                      Icons.credit_card_outlined,
+                                    ),
+                                    _buildKTPField(
+                                      'Full Name',
+                                      _fullNameController,
+                                      Icons.person_outline,
+                                    ),
+                                    _buildKTPField(
+                                      'First Name',
+                                      _firstNameController,
+                                      Icons.person_outline,
+                                    ),
+                                    _buildKTPField(
+                                      'Last Name',
+                                      _lastNameController,
+                                      Icons.person_outline,
+                                    ),
+                                    _buildKTPField(
+                                      'Birth Place',
+                                      _birthPlaceController,
+                                      Icons.place_outlined,
+                                    ),
+                                    _buildKTPField(
+                                      'Birth Date',
+                                      _birthDateController,
+                                      Icons.calendar_today_outlined,
+                                    ),
+                                    _buildKTPField(
+                                      'Gender',
+                                      _genderController,
+                                      Icons.wc_outlined,
+                                    ),
+                                    _buildKTPField(
+                                      'Address',
+                                      _addressController,
+                                      Icons.home_outlined,
+                                    ),
+                                    _buildKTPField(
+                                      'RT',
+                                      _rtController,
+                                      Icons.home_outlined,
+                                    ),
+                                    _buildKTPField(
+                                      'RW',
+                                      _rwController,
+                                      Icons.home_outlined,
+                                    ),
+                                    _buildKTPField(
+                                      'Village',
+                                      _villageController,
+                                      Icons.location_city_outlined,
+                                    ),
+                                    _buildKTPField(
+                                      'District',
+                                      _districtController,
+                                      Icons.location_city_outlined,
+                                    ),
+                                    _buildKTPField(
+                                      'Religion',
+                                      _religionController,
+                                      Icons.church_outlined,
+                                    ),
+                                    _buildKTPField(
+                                      'Marital Status',
+                                      _maritalStatusController,
+                                      Icons.favorite_outlined,
+                                    ),
+                                    _buildKTPField(
+                                      'Occupation',
+                                      _occupationController,
+                                      Icons.work_outline,
+                                    ),
+                                    _buildKTPField(
+                                      'Citizenship',
+                                      _citizenshipController,
+                                      Icons.flag_outlined,
+                                    ),
+                                    _buildKTPField(
+                                      'Valid Until',
+                                      _validUntilController,
+                                      Icons.schedule_outlined,
+                                    ),
+
+                                    const SizedBox(height: 16),
+                                    // Space for bottom button
+                                    const SizedBox(height: 100),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
-                  Container(
-                    height: 3,
-                    margin: const EdgeInsets.only(top: 0),
-                    child: TabBar(
-                      controller: _tabController,
-                      indicator: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF4CB04C), Color(0xFFF8D86E)],
-                        ),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                      indicatorColor: Colors.transparent,
-                      dividerColor: Colors.transparent,
-                      labelColor: Colors.transparent,
-                      unselectedLabelColor: Colors.transparent,
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      tabs: const [
-                        Tab(text: 'Profile'),
-                        Tab(text: 'KTP'),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+
+      // Bottom Navigation Bar to cover gradient
+      bottomNavigationBar: Container(
+        color: Colors.white,
+        padding: const EdgeInsets.all(24),
+        child: SafeArea(
+          child: SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: () {
+                DialogHelper.showSuccess(
+                  context,
+                  title: 'Success',
+                  message: 'Profile updated successfully!',
+                  onConfirm: () {
+                    // Optional: Navigate back or refresh
+                  },
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4CB04C),
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey[300],
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Update Profile',
+                style: TextStyle(
+                  fontFamily: 'Open Sans',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
 
-            // Tab Bar View
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  // Profile Tab
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const SizedBox(height: 16),
+  Widget _buildStatusField() {
+    final isVerified = _statusController.text == 'Verified';
 
-                          const Text(
-                            'User ID',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black87,
-                              fontFamily: 'Open Sans',
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          _buildTextField(
-                            icon: Icons.badge_outlined,
-                            hintText: "User ID",
-                            controller: _userIdController,
-                            enabled: false,
-                          ),
-                          const SizedBox(height: 16),
-
-                          const Text(
-                            'User Name',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black87,
-                              fontFamily: 'Open Sans',
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          _buildTextField(
-                            icon: Icons.person_outline,
-                            hintText: "Username",
-                            controller: _usernameController,
-                          ),
-                          const SizedBox(height: 16),
-
-                          const Text(
-                            'Phone',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black87,
-                              fontFamily: 'Open Sans',
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          _buildTextField(
-                            icon: Icons.phone_outlined,
-                            hintText: "Phone Number",
-                            controller: _phoneController,
-                            keyboardType: TextInputType.phone,
-                          ),
-                          const SizedBox(height: 16),
-
-                          const Text(
-                            'Email',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black87,
-                              fontFamily: 'Open Sans',
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          _buildTextField(
-                            icon: Icons.email_outlined,
-                            hintText: "Email",
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
-                          ),
-                          const SizedBox(height: 16),
-
-                          const Text(
-                            'Country',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black87,
-                              fontFamily: 'Open Sans',
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          _buildTextField(
-                            icon: Icons.public_outlined,
-                            hintText: "Country",
-                            controller: _countryController,
-                          ),
-                          const SizedBox(height: 16),
-
-                          const Text(
-                            'Status',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black87,
-                              fontFamily: 'Open Sans',
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          _buildTextField(
-                            icon: Icons.verified_outlined,
-                            hintText: "Status",
-                            controller: _statusController,
-                            enabled: false,
-                          ),
-                          const SizedBox(height: 32),
-
-                          // Save Button
-                          ElevatedButton(
-                            onPressed: () {
-                              // Show confirmation dialog before saving
-                              DialogHelper.showWarning(
-                                context,
-                                title: 'Save Changes',
-                                message:
-                                    'Are you sure you want to save these changes to your profile?',
-                                confirmText: 'Save',
-                                cancelText: 'Cancel',
-                                onConfirm: () {
-                                  // Show success dialog (no API action yet)
-                                  DialogHelper.showSuccess(
-                                    context,
-                                    title: 'Success',
-                                    message: 'Profile updated successfully!',
-                                    onConfirm: () {
-                                      // Just dismiss for now
-                                    },
-                                  );
-                                },
-                                onCancel: () {
-                                  // Do nothing, just dismiss
-                                },
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF4CB04C),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(25),
-                              ),
-                            ),
-                            child: const Text(
-                              'Save Changes',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                                fontFamily: 'Open Sans',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // KTP Tab
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const SizedBox(height: 16),
-
-                          _buildKTPField(
-                            'Province',
-                            _provinceController,
-                            Icons.location_city_outlined,
-                          ),
-                          _buildKTPField(
-                            'City',
-                            _cityController,
-                            Icons.location_on_outlined,
-                          ),
-                          _buildKTPField(
-                            'National ID Number',
-                            _nationalIdController,
-                            Icons.credit_card_outlined,
-                          ),
-                          _buildKTPField(
-                            'Full Name',
-                            _fullNameController,
-                            Icons.person_outline,
-                          ),
-                          _buildKTPField(
-                            'First Name',
-                            _firstNameController,
-                            Icons.person_outline,
-                          ),
-                          _buildKTPField(
-                            'Last Name',
-                            _lastNameController,
-                            Icons.person_outline,
-                          ),
-                          _buildKTPField(
-                            'Birth Place',
-                            _birthPlaceController,
-                            Icons.place_outlined,
-                          ),
-                          _buildKTPField(
-                            'Birth Date',
-                            _birthDateController,
-                            Icons.calendar_today_outlined,
-                          ),
-                          _buildKTPField(
-                            'Gender',
-                            _genderController,
-                            Icons.wc_outlined,
-                          ),
-                          _buildKTPField(
-                            'Address',
-                            _addressController,
-                            Icons.home_outlined,
-                          ),
-                          _buildKTPField(
-                            'RT',
-                            _rtController,
-                            Icons.home_outlined,
-                          ),
-                          _buildKTPField(
-                            'RW',
-                            _rwController,
-                            Icons.home_outlined,
-                          ),
-                          _buildKTPField(
-                            'Village',
-                            _villageController,
-                            Icons.location_city_outlined,
-                          ),
-                          _buildKTPField(
-                            'District',
-                            _districtController,
-                            Icons.location_city_outlined,
-                          ),
-                          _buildKTPField(
-                            'Religion',
-                            _religionController,
-                            Icons.church_outlined,
-                          ),
-                          _buildKTPField(
-                            'Marital Status',
-                            _maritalStatusController,
-                            Icons.favorite_outlined,
-                          ),
-                          _buildKTPField(
-                            'Occupation',
-                            _occupationController,
-                            Icons.work_outline,
-                          ),
-                          _buildKTPField(
-                            'Citizenship',
-                            _citizenshipController,
-                            Icons.flag_outlined,
-                          ),
-                          _buildKTPField(
-                            'Valid Until',
-                            _validUntilController,
-                            Icons.schedule_outlined,
-                          ),
-
-                          const SizedBox(height: 16),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isVerified
+              ? Colors.blue.withOpacity(0.3)
+              : Colors.red.withOpacity(0.3),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        child: Row(
+          children: [
+            Icon(
+              isVerified ? Icons.verified : Icons.warning,
+              color: isVerified ? Colors.blue : Colors.red,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              _statusController.text,
+              style: TextStyle(
+                fontSize: 16,
+                fontFamily: 'Open Sans',
+                color: isVerified ? Colors.blue : Colors.red,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
@@ -568,13 +629,6 @@ class _EditProfileScreenState extends State<EditProfileScreen>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: TextField(
         controller: controller,

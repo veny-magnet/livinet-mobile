@@ -7,6 +7,7 @@ import '../../core/services/user_profile_service.dart';
 import '../../core/services/auth_service.dart';
 import 'edit_profile_screen.dart';
 import 'address_screen.dart';
+import 'change-password_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -122,7 +123,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
           );
         },
       },
-      {'icon': Icons.lock_outline, 'title': 'Change Password', 'onTap': null},
+      {
+        'icon': Icons.lock_outline,
+        'title': 'Change Password',
+        'onTap': () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const ChangePasswordScreen(),
+            ),
+          );
+        },
+      },
       {'icon': Icons.emoji_events_outlined, 'title': 'Points', 'onTap': null},
     ];
 

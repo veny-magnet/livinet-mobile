@@ -6,6 +6,9 @@ import '../../core/widgets/bill_card.dart';
 import '../../core/widgets/custom_gradient_header.dart';
 import '../../core/widgets/not_verified_widget.dart';
 import '../../core/services/user_profile_service.dart';
+import '../../core/services/order_service.dart';
+import '../../core/services/bill_service.dart';
+import '../../core/models/order_summary.dart';
 import '../payment/payment_screen.dart';
 
 class PayScreen extends StatefulWidget {
@@ -18,6 +21,9 @@ class PayScreen extends StatefulWidget {
 class _PayScreenState extends State<PayScreen> {
   String status = '';
   bool isLoading = true;
+  bool isPlacingOrder = false;
+  List<dynamic> billHistory = [];
+  Map<String, dynamic>? currentBill;
 
   @override
   void initState() {
@@ -36,8 +42,16 @@ class _PayScreenState extends State<PayScreen> {
         final data = result['data'];
         setState(() {
           status = data.status ?? '';
-          isLoading = false;
         });
+
+        // Load bills only if user is verified
+        if (status == 'verified') {
+          await _loadBillData(defaultUserId);
+        } else {
+          setState(() {
+            isLoading = false;
+          });
+        }
       } else {
         setState(() {
           status = '';
@@ -47,6 +61,42 @@ class _PayScreenState extends State<PayScreen> {
     } catch (e) {
       setState(() {
         status = '';
+        isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadBillData(String userId) async {
+    try {
+      final result = await BillService.instance.getBillHistory(userId: userId);
+
+      if (result['success'] == true && result['data'] != null) {
+        final data = result['data'] as Map<String, dynamic>;
+        final bills = data['bills'] as List<dynamic>? ?? [];
+
+        setState(() {
+          billHistory = bills;
+          // Get the latest unpaid bill as current bill
+          currentBill = bills.isNotEmpty
+              ? bills.firstWhere(
+                  (bill) =>
+                      bill['status'] == 'pending' || bill['status'] == 'unpaid',
+                  orElse: () => bills.first,
+                )
+              : null;
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          billHistory = [];
+          currentBill = null;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        billHistory = [];
+        currentBill = null;
         isLoading = false;
       });
     }
@@ -84,23 +134,16 @@ class _PayScreenState extends State<PayScreen> {
               ),
               const SizedBox(height: 10),
               BillCard(
-                planName: 'LiviHome Premium',
+                planName: currentBill?['product_name'] ?? 'No Active Plan',
                 billLabel: 'Your Bill',
-                amount: 'Rp 225,000',
-                lastPaymentDate: '05 September 2025',
-                onPayPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const PaymentScreen(
-                        planName: 'LiviPro Superfast',
-                        amount: 'Rp 225,000',
-                        billNumber: '23989021890',
-                        period: '(01-08-2025 to 31/08/2025)',
-                      ),
-                    ),
-                  );
-                },
+                amount: currentBill != null
+                    ? 'Rp ${(currentBill!['amount'] ?? 0).toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}'
+                    : 'Rp 0',
+                status: currentBill?['status'] ?? 'none',
+                isProcessing: isPlacingOrder,
+                onPayPressed: currentBill != null && !isPlacingOrder
+                    ? _handlePay
+                    : null,
               ),
             ],
           ),
@@ -141,11 +184,12 @@ class _PayScreenState extends State<PayScreen> {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(16),
-                    itemCount: 5,
+                    itemCount: billHistory.length,
                     separatorBuilder: (context, index) =>
                         Divider(color: Colors.grey.shade300),
                     itemBuilder: (context, index) {
-                      final isPaid = index % 2 == 0;
+                      final bill = billHistory[index];
+                      final isPaid = bill['status'] == 'paid';
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         child: Row(
@@ -155,7 +199,11 @@ class _PayScreenState extends State<PayScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    '28 Feb 2025',
+                                    _formatDate(
+                                      bill['created_at'] ??
+                                          bill['payment_deadline'] ??
+                                          '',
+                                    ),
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey.shade600,
@@ -175,7 +223,9 @@ class _PayScreenState extends State<PayScreen> {
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
-                                      isPaid ? 'PAID' : 'UNPAID',
+                                      (bill['status'] ?? 'UNKNOWN')
+                                          .toString()
+                                          .toUpperCase(),
                                       style: TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.w600,
@@ -189,9 +239,9 @@ class _PayScreenState extends State<PayScreen> {
                                 ],
                               ),
                             ),
-                            const Text(
-                              'Rp 225,000',
-                              style: TextStyle(
+                            Text(
+                              'Rp ${(bill['amount'] ?? 0).toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                              style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.black,
@@ -217,5 +267,89 @@ class _PayScreenState extends State<PayScreen> {
       ),
       bottomNavigationBar: const AppBottomNavigation(currentRoute: '/pay'),
     );
+  }
+
+  Future<void> _handlePay() async {
+    if (isPlacingOrder) {
+      return;
+    }
+    setState(() {
+      isPlacingOrder = true;
+    });
+
+    try {
+      const defaultUserId = 'CR006000';
+      const defaultProductId = 24;
+      const defaultAddressId = 1;
+      const defaultLevel = '2';
+      const defaultBlock = 'A';
+      const defaultUnitNumber = '201';
+
+      final result = await OrderService.instance.createOrder(
+        userId: defaultUserId,
+        productId: defaultProductId,
+        userAddressId: defaultAddressId,
+        level: defaultLevel,
+        block: defaultBlock,
+        unitNumber: defaultUnitNumber,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      if (result['success'] == true && result['data'] is OrderSummary) {
+        final summary = result['data'] as OrderSummary;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PaymentScreen(orderSummary: summary),
+          ),
+        );
+      } else {
+        final message = result['message']?.toString() ?? 'Gagal membuat order.';
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+      }
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Terjadi kesalahan: $e')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          isPlacingOrder = false;
+        });
+      }
+    }
+  }
+
+  String _formatDate(String dateString) {
+    if (dateString.isEmpty) return 'N/A';
+
+    try {
+      final date = DateTime.parse(dateString);
+      final months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
+      return '${date.day} ${months[date.month - 1]} ${date.year}';
+    } catch (e) {
+      return dateString; // Return original if parsing fails
+    }
   }
 }

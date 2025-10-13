@@ -42,9 +42,18 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   void _onAddressChanged(UserAddress? address) {
-    // Reload products when address changes
+    // Clear product cache before loading new products
+    // This ensures we don't get stale cached data
     if (status == 'verified') {
-      _loadProducts(defaultUserId, address?.addressId);
+      // Force clear product cache for this user to prevent stale data
+      ProductService.instance.clearCache(userId: defaultUserId);
+
+      // Add small delay to ensure cache is cleared before loading
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted) {
+          _loadProducts(defaultUserId, address?.addressId);
+        }
+      });
     }
   }
 
@@ -60,12 +69,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
           status = data.status ?? '';
         });
 
-        // Load products if user is verified
         if (status == 'verified') {
-          // Load default address if not already loaded
           await AddressManager.instance.loadDefaultAddress(defaultUserId);
 
-          // Load products with selected address
           final selectedAddressId = AddressManager.instance.selectedAddressId;
           await _loadProducts(defaultUserId, selectedAddressId);
         } else {

@@ -5,16 +5,18 @@ class BillCard extends StatelessWidget {
   final String planName;
   final String billLabel;
   final String amount;
-  final String lastPaymentDate;
+  final String status;
   final VoidCallback? onPayPressed;
+  final bool isProcessing;
 
   const BillCard({
     super.key,
     required this.planName,
     required this.billLabel,
     required this.amount,
-    required this.lastPaymentDate,
+    required this.status,
     this.onPayPressed,
+    this.isProcessing = false,
   });
 
   @override
@@ -70,7 +72,7 @@ class BillCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     ElevatedButton(
-                      onPressed: onPayPressed,
+                      onPressed: isProcessing ? null : onPayPressed,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF4CB04C),
                         foregroundColor: Colors.white,
@@ -85,14 +87,25 @@ class BillCard extends StatelessWidget {
                         minimumSize: const Size(60, 32),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      child: const Text(
-                        'Pay',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'Open Sans',
-                        ),
-                      ),
+                      child: isProcessing
+                          ? const SizedBox(
+                              height: 16,
+                              width: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          : const Text(
+                              'Pay',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Open Sans',
+                              ),
+                            ),
                     ),
                   ],
                 ),
@@ -109,19 +122,31 @@ class BillCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Latest payment on:',
+                      'Status',
                       style: TextStyle(
                         fontSize: 10,
                         color: Colors.black.withOpacity(0.6),
                         fontFamily: 'Open Sans',
                       ),
                     ),
-                    Text(
-                      lastPaymentDate,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.black.withOpacity(0.8),
-                        fontFamily: 'Open Sans',
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        status.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black.withOpacity(0.7),
+                          fontFamily: 'Open Sans',
+                          letterSpacing: 0.5,
+                        ),
                       ),
                     ),
                   ],

@@ -59,8 +59,25 @@ class _AddressSelectorState extends State<AddressSelector>
         if (result['success'] == true && result['data'] != null) {
           addresses = List<UserAddress>.from(result['data']);
           if (addresses.isNotEmpty) {
-            selectedAddress = addresses.first;
-            displayAddress = selectedAddress!.formattedAddress;
+            // Check if we have a previously selected address from AddressManager
+            final currentSelected = AddressManager.instance.selectedAddress;
+            if (currentSelected != null) {
+              // Try to find the same address in the current list
+              final matchingAddress = addresses.firstWhere(
+                (addr) => addr.addressId == currentSelected.addressId,
+                orElse: () => addresses.first,
+              );
+              selectedAddress = matchingAddress;
+              displayAddress = matchingAddress.formattedAddress;
+
+              // Update AddressManager to ensure consistency
+              AddressManager.instance.setSelectedAddress(matchingAddress);
+            } else {
+              selectedAddress = addresses.first;
+              displayAddress = selectedAddress!.formattedAddress;
+              // Set first address as default in AddressManager
+              AddressManager.instance.setSelectedAddress(addresses.first);
+            }
           } else {
             displayAddress = widget.defaultAddress ?? 'No address found';
           }

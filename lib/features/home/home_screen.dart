@@ -7,7 +7,7 @@ import '../../core/widgets/quick_action_section.dart';
 import '../../core/widgets/points_section.dart';
 import '../../core/widgets/banner_section.dart';
 import '../../core/services/user_profile_service.dart';
-import '../payment/payment_screen.dart';
+import '../../core/services/bill_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,6 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int points = 0;
   String status = '';
   bool isLoading = true;
+  Map<String, dynamic>? currentBill;
 
   @override
   void initState() {
@@ -45,8 +46,16 @@ class _HomeScreenState extends State<HomeScreen> {
           userId = data.userId ?? '';
           points = data.points ?? 0;
           status = data.status ?? '';
-          isLoading = false;
         });
+
+        // Load current bill if user is verified
+        if (status == 'verified') {
+          await _loadCurrentBill(defaultUserId);
+        } else {
+          setState(() {
+            isLoading = false;
+          });
+        }
       } else {
         setState(() {
           username = 'User';
@@ -66,6 +75,40 @@ class _HomeScreenState extends State<HomeScreen> {
         isLoading = false;
       });
       print('Error loading profile: $e');
+    }
+  }
+
+  Future<void> _loadCurrentBill(String userId) async {
+    try {
+      final result = await BillService.instance.getBillHistory(userId: userId);
+
+      if (result['success'] == true && result['data'] != null) {
+        final data = result['data'] as Map<String, dynamic>;
+        final bills = data['bills'] as List<dynamic>? ?? [];
+
+        setState(() {
+          // Get the latest unpaid bill as current bill
+          currentBill = bills.isNotEmpty
+              ? bills.firstWhere(
+                  (bill) =>
+                      bill['status'] == 'pending' || bill['status'] == 'unpaid',
+                  orElse: () => bills.first,
+                )
+              : null;
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          currentBill = null;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        currentBill = null;
+        isLoading = false;
+      });
+      print('Error loading current bill: $e');
     }
   }
 
@@ -180,23 +223,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 16),
 
                     BillCard(
-                      planName: 'LiviHome Premium',
+                      planName:
+                          currentBill?['product_name'] ?? 'No Active Plan',
                       billLabel: 'Your Bill',
-                      amount: 'Rp 225,000',
-                      lastPaymentDate: '05 September 2025',
-                      onPayPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const PaymentScreen(
-                              planName: 'LiviPro Superfast',
-                              amount: 'Rp 225,000',
-                              billNumber: '23989021890',
-                              period: '(01-08-2025 to 31/08/2025)',
-                            ),
-                          ),
-                        );
-                      },
+                      amount: currentBill != null
+                          ? 'Rp ${(currentBill!['amount'] ?? 0).toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}'
+                          : 'Rp 0',
+                      status: currentBill?['status'] ?? 'none',
+                      onPayPressed: currentBill != null
+                          ? () {
+                              // Navigate to pay screen instead of creating mock order
+                              Navigator.pushNamed(context, '/pay');
+                            }
+                          : null,
                     ),
                   ],
                 ],

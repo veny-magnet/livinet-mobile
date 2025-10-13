@@ -52,7 +52,7 @@ class Product {
 }
 
 class ProductService {
-  static const String baseUrl = 'https://276dccd11ccd.ngrok-free.app/api/v1';
+  static const String baseUrl = 'https://3580dc107926.ngrok-free.app/api/v1';
 
   static ProductService? _instance;
   Map<String, List<Product>> _cachedProducts = {};
@@ -73,17 +73,23 @@ class ProductService {
   }) async {
     try {
       final cacheKey = 'products_${userId}_${addressId ?? 'no_address'}';
+      print('ProductService - Requesting products with key: $cacheKey');
 
       // Check if we have cached data for this specific key
       if (_cachedProducts.containsKey(cacheKey) &&
           _lastFetch.containsKey(cacheKey) &&
           DateTime.now().difference(_lastFetch[cacheKey]!) < _cacheExpiry) {
+        print('ProductService - Returning cached products for key: $cacheKey');
         return {
           'success': true,
           'data': _cachedProducts[cacheKey],
           'message': 'Products fetched from cache',
         };
       }
+
+      print(
+        'ProductService - Cache miss, fetching from API for key: $cacheKey',
+      );
 
       // Get auth token
       final authService = AuthService();
@@ -129,6 +135,10 @@ class ProductService {
               .toList();
           _cachedProducts[cacheKey] = products;
           _lastFetch[cacheKey] = DateTime.now();
+
+          print(
+            'ProductService - Cached ${products.length} products with key: $cacheKey',
+          );
 
           return {
             'success': true,

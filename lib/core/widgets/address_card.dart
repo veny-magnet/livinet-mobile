@@ -4,11 +4,13 @@ import '../services/address_service.dart';
 class AddressCard extends StatelessWidget {
   final UserAddress address;
   final VoidCallback onDetailTap;
+  final VoidCallback? onDeleteTap;
 
   const AddressCard({
     super.key,
     required this.address,
     required this.onDetailTap,
+    this.onDeleteTap,
   });
 
   @override
@@ -19,42 +21,19 @@ class AddressCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Location Icon
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.location_on,
-                color: Colors.grey,
-                size: 20,
-              ),
-            ),
-
-            const SizedBox(width: 12),
-
-            // Address Content
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Area name (title)
-                  Text(
+            // Header Row: State Name + Action Buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // State Name (Main Title)
+                Expanded(
+                  child: Text(
                     address.areaName,
                     style: const TextStyle(
                       fontSize: 16,
@@ -63,49 +42,68 @@ class AddressCard extends StatelessWidget {
                       fontFamily: 'Open Sans',
                     ),
                   ),
+                ),
 
-                  const SizedBox(height: 4),
-
-                  // Full address
-                  Text(
-                    '${address.address}, ${address.cityName}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                      fontFamily: 'Open Sans',
+                // Action Buttons
+                Row(
+                  children: [
+                    // Edit/Detail Button
+                    InkWell(
+                      onTap: onDetailTap,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF4CB04C).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.edit_outlined,
+                          color: Color(0xFF4CB04C),
+                          size: 18,
+                        ),
+                      ),
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
+
+                    const SizedBox(width: 8),
+
+                    // Delete Button
+                    if (onDeleteTap != null)
+                      InkWell(
+                        onTap: onDeleteTap,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4CB04C).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.delete_outline,
+                            color: Color(0xFF4CB04C),
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
             ),
 
-            const SizedBox(width: 12),
+            const SizedBox(height: 12),
 
-            // Detail Button
-            InkWell(
-              onTap: onDetailTap,
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFF4CB04C)),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Text(
-                  'Detail',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF4CB04C),
-                    fontFamily: 'Open Sans',
-                  ),
-                ),
+            // Address Details
+            Text(
+              '${address.address}, ${address.cityName}, ${address.stateName}, ${address.postcode}',
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+                fontFamily: 'Open Sans',
               ),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

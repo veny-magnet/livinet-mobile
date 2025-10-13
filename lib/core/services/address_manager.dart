@@ -63,6 +63,23 @@ class AddressManager {
     }
   }
 
+  /// Get address by ID
+  UserAddress? getAddressById(int addressId, List<UserAddress> addresses) {
+    try {
+      return addresses.firstWhere((addr) => addr.addressId == addressId);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Update selected address by ID to ensure consistency
+  void updateSelectedAddressById(int addressId, List<UserAddress> addresses) {
+    final address = getAddressById(addressId, addresses);
+    if (address != null) {
+      setSelectedAddress(address);
+    }
+  }
+
   /// Get formatted location text
   String get formattedLocation {
     if (_selectedAddress == null) return 'Location not available';
