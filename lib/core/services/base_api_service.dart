@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../models/api_response.dart';
+import 'auth_service.dart';
 
 class ApiException implements Exception {
   final String message;
@@ -14,11 +15,11 @@ class ApiException implements Exception {
 }
 
 class BaseApiService {
-  static const String baseUrl = 'https://3580dc107926.ngrok-free.app/api/v1';
+  static const String baseUrl = 'https://6e4d717edb7b.ngrok-free.app/api/v1';
 
   // These should be configured according to your Laravel API requirements
-  static const String nameServer = 'livinet-mobile-app';
-  static const String keyServer = 'your-api-key-here';
+  static const String nameServer = 'LIVINET_API_SERVER';
+  static const String keyServer = 'LIVINET_API_KEY_12345';
 
   Map<String, String> get _baseHeaders => {
     'Content-Type': 'application/json',
@@ -27,8 +28,22 @@ class BaseApiService {
     'key_server': keyServer,
   };
 
-  Map<String, String> _getHeaders({Map<String, String>? additionalHeaders}) {
+  Future<Map<String, String>> _getHeaders({
+    Map<String, String>? additionalHeaders,
+  }) async {
     final headers = Map<String, String>.from(_baseHeaders);
+
+    // Add bearer token if available
+    try {
+      final authService = AuthService();
+      final token = await authService.getAuthToken();
+      if (token != null && token.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+    } catch (e) {
+      print('Error getting auth token: $e');
+    }
+
     if (additionalHeaders != null) {
       headers.addAll(additionalHeaders);
     }
@@ -46,10 +61,8 @@ class BaseApiService {
         '$baseUrl$endpoint',
       ).replace(queryParameters: queryParams);
 
-      final response = await http.get(
-        uri,
-        headers: _getHeaders(additionalHeaders: headers),
-      );
+      final requestHeaders = await _getHeaders(additionalHeaders: headers);
+      final response = await http.get(uri, headers: requestHeaders);
 
       return _handleResponse<T>(response, fromJson);
     } on SocketException {
@@ -68,9 +81,10 @@ class BaseApiService {
     T Function(dynamic)? fromJson,
   }) async {
     try {
+      final requestHeaders = await _getHeaders(additionalHeaders: headers);
       final response = await http.post(
         Uri.parse('$baseUrl$endpoint'),
-        headers: _getHeaders(additionalHeaders: headers),
+        headers: requestHeaders,
         body: body != null ? jsonEncode(body) : null,
       );
 

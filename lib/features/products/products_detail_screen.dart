@@ -2,12 +2,8 @@ import 'package:flutter/material.dart';
 import '../../core/services/product_service.dart';
 import '../../core/services/product_detail_service.dart';
 import '../../core/services/address_service.dart';
-import '../../core/services/address_manager.dart';
-import '../../core/services/order_service.dart';
-import '../../core/services/auth_service.dart';
-import '../../core/widgets/unit_info_dialog.dart';
-import '../../core/models/order_summary.dart';
-import '../payment/payment_screen.dart';
+import '../../core/services/user_profile_service.dart';
+import '../../core/widgets/order_dialog.dart';
 
 class ProductsDetailScreen extends StatefulWidget {
   final String? title;
@@ -30,10 +26,9 @@ class ProductsDetailScreen extends StatefulWidget {
 class _ProductsDetailScreenState extends State<ProductsDetailScreen> {
   bool isLoading = true;
   String errorMessage = '';
-  bool isOrdering = false;
   ProductDetail? productDetail;
   String locationText = '';
-  String? _cachedUserId;
+  String userId = '';
 
   // Get display values
   String get displayTitle => widget.product?.name ?? widget.title ?? '';
@@ -53,22 +48,21 @@ class _ProductsDetailScreenState extends State<ProductsDetailScreen> {
     });
 
     try {
+      // Load user profile to get userId
+      await _loadUserProfile();
+
+      // Load location from address service
       await _loadLocation();
 
-      final product = widget.product;
-      if (product != null) {
-        await _loadProductDetail(product.pid);
+      // Load product detail if we have product data
+      if (widget.product != null) {
+        await _loadProductDetail(widget.product!.pid);
       }
 
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
+      setState(() {
+        isLoading = false;
+      });
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
       setState(() {
         isLoading = false;
         errorMessage = 'Error loading data: $e';
@@ -76,62 +70,54 @@ class _ProductsDetailScreenState extends State<ProductsDetailScreen> {
     }
   }
 
+  Future<void> _loadUserProfile() async {
+    try {
+      final result = await UserProfileService.instance.getCurrentUserProfile();
+
+      if (result['success'] == true && result['data'] != null) {
+        final data = result['data'];
+        setState(() {
+          userId = data.userId ?? '';
+        });
+      }
+    } catch (e) {
+      print('Error loading user profile: $e');
+    }
+  }
+
   Future<void> _loadLocation() async {
     try {
-      final userId = await _resolveUserId();
-      final manager = AddressManager.instance;
-
-      if (manager.selectedAddress != null) {
-        final address = manager.selectedAddress!;
-        if (mounted) {
-          setState(() {
-            locationText =
-                'Available in ${address.areaName}, ${address.cityName}, ${address.stateName}';
-          });
-        }
-        return;
-      }
-
-      final cachedAddresses = AddressService.instance.getCachedAddresses(
-        userId,
-      );
-      if (cachedAddresses != null && cachedAddresses.isNotEmpty) {
-        manager.setSelectedAddress(cachedAddresses.first);
-        if (mounted) {
-          setState(() {
-            locationText =
-                'Available in ${cachedAddresses.first.areaName}, ${cachedAddresses.first.cityName}, ${cachedAddresses.first.stateName}';
-          });
-        }
+      if (userId.isEmpty) {
+        setState(() {
+          locationText = widget.location ?? 'Location not available';
+        });
         return;
       }
 
       final result = await AddressService.instance.getUserAddresses(userId);
+
       if (result['success'] == true && result['data'] != null) {
         final List<UserAddress> addresses = result['data'] as List<UserAddress>;
         if (addresses.isNotEmpty) {
-          manager.setSelectedAddress(addresses.first);
-          if (mounted) {
-            setState(() {
-              locationText =
-                  'Available in ${addresses.first.areaName}, ${addresses.first.cityName}, ${addresses.first.stateName}';
-            });
-          }
-          return;
+          final address = addresses.first;
+          setState(() {
+            locationText =
+                'Available in ${address.areaName}, ${address.cityName}, ${address.stateName}';
+          });
+        } else {
+          setState(() {
+            locationText = widget.location ?? 'Location not available';
+          });
         }
-      }
-
-      if (mounted) {
+      } else {
         setState(() {
           locationText = widget.location ?? 'Location not available';
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          locationText = widget.location ?? 'Location not available';
-        });
-      }
+      setState(() {
+        locationText = widget.location ?? 'Location not available';
+      });
     }
   }
 
@@ -142,210 +128,20 @@ class _ProductsDetailScreenState extends State<ProductsDetailScreen> {
       );
 
       if (result['success'] == true && result['data'] != null) {
-        if (mounted) {
-          setState(() {
-            productDetail = result['data'] as ProductDetail;
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('Error loading product detail: $e');
-    }
-  }
-
-  Future<String> _resolveUserId() async {
-    if (_cachedUserId != null && _cachedUserId!.isNotEmpty) {
-      return _cachedUserId!;
-    }
-
-    final authService = AuthService();
-    final currentUser = await authService.getCurrentUser();
-    final resolvedId = _extractUserId(currentUser) ?? 'CR006000';
-    _cachedUserId = resolvedId;
-    return resolvedId;
-  }
-
-  String? _extractUserId(Map<String, dynamic>? data) {
-    if (data == null) {
-      return null;
-    }
-
-    final directKeys = ['user_id', 'userId', 'userid'];
-    for (final key in directKeys) {
-      final value = data[key];
-      if (value != null && value.toString().isNotEmpty) {
-        return value.toString();
-      }
-    }
-
-    if (data['user'] is Map<String, dynamic>) {
-      final userMap = data['user'] as Map<String, dynamic>;
-      final value = userMap['user_id'] ?? userMap['userId'] ?? userMap['id'];
-      if (value != null && value.toString().isNotEmpty) {
-        return value.toString();
-      }
-    }
-
-    if (data['data'] is Map<String, dynamic>) {
-      final nested = data['data'] as Map<String, dynamic>;
-      final value =
-          nested['user_id'] ??
-          nested['userId'] ??
-          nested['userid'] ??
-          nested['id'];
-      if (value != null && value.toString().isNotEmpty) {
-        return value.toString();
-      }
-    }
-
-    return null;
-  }
-
-  Future<void> _handleUnitSelection() async {
-    String? level;
-    String? block;
-    String? unitNumber;
-
-    await showUnitInfoDialog(
-      context,
-      onConfirm: (selectedLevel, selectedBlock, selectedUnit) {
-        level = selectedLevel;
-        block = selectedBlock;
-        unitNumber = selectedUnit;
-      },
-    );
-
-    if (!mounted) {
-      return;
-    }
-
-    if (level == null || block == null || unitNumber == null) {
-      return;
-    }
-
-    await _createOrder(level!, block!, unitNumber!);
-  }
-
-  Future<void> _createOrder(
-    String level,
-    String block,
-    String unitNumber,
-  ) async {
-    if (isOrdering) {
-      return;
-    }
-
-    final productId = _resolveProductId();
-    if (productId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Product ID tidak ditemukan.')),
-      );
-      return;
-    }
-
-    setState(() {
-      isOrdering = true;
-    });
-
-    try {
-      final userId = await _resolveUserId();
-      final addressId = await _resolveAddressId(userId);
-
-      if (addressId == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Alamat tidak tersedia.')),
-          );
-        }
-        return;
-      }
-
-      final result = await OrderService.instance.createOrder(
-        userId: userId,
-        productId: productId,
-        userAddressId: addressId,
-        level: level,
-        block: block,
-        unitNumber: unitNumber,
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      if (result['success'] == true && result['data'] is OrderSummary) {
-        final summary = result['data'] as OrderSummary;
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PaymentScreen(orderSummary: summary),
-          ),
-        );
-      } else {
-        final message = result['message']?.toString() ?? 'Gagal membuat order.';
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Terjadi kesalahan: $e')));
-      }
-    } finally {
-      if (mounted) {
         setState(() {
-          isOrdering = false;
+          productDetail = result['data'] as ProductDetail;
         });
       }
+    } catch (e) {
+      print('Error loading product detail: $e');
     }
   }
 
-  int? _resolveProductId() {
-    if (widget.product != null) {
-      return widget.product!.pid;
-    }
-
-    final raw = productDetail?.rawData ?? {};
-    final possibleKeys = ['pid', 'product_id', 'id'];
-    for (final key in possibleKeys) {
-      final value = raw[key];
-      if (value is int) {
-        return value;
-      }
-      if (value != null) {
-        final parsed = int.tryParse(value.toString());
-        if (parsed != null) {
-          return parsed;
-        }
-      }
-    }
-    return null;
-  }
-
-  Future<int?> _resolveAddressId(String userId) async {
-    final manager = AddressManager.instance;
-    if (manager.selectedAddressId != null) {
-      return manager.selectedAddressId;
-    }
-
-    final cachedAddresses = AddressService.instance.getCachedAddresses(userId);
-    if (cachedAddresses != null && cachedAddresses.isNotEmpty) {
-      manager.setSelectedAddress(cachedAddresses.first);
-      return cachedAddresses.first.addressId;
-    }
-
-    final result = await AddressService.instance.getUserAddresses(userId);
-    if (result['success'] == true && result['data'] != null) {
-      final List<UserAddress> addresses = result['data'] as List<UserAddress>;
-      if (addresses.isNotEmpty) {
-        manager.setSelectedAddress(addresses.first);
-        return addresses.first.addressId;
-      }
-    }
-
-    return null;
+  void _showOrderDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => OrderDialog(product: widget.product!),
+    );
   }
 
   @override
@@ -525,33 +321,35 @@ class _ProductsDetailScreenState extends State<ProductsDetailScreen> {
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: isOrdering ? null : _handleUnitSelection,
+                      onPressed: () {
+                        if (widget.product != null) {
+                          _showOrderDialog();
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Product information not available',
+                              ),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF4CB04C),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(25),
                         ),
                       ),
-                      child: isOrdering
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
-                                ),
-                              ),
-                            )
-                          : const Text(
-                              'Choose',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                                fontFamily: 'Open Sans',
-                              ),
-                            ),
+                      child: const Text(
+                        'Choose',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                          fontFamily: 'Open Sans',
+                        ),
+                      ),
                     ),
                   ),
 

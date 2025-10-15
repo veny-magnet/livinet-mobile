@@ -7,9 +7,11 @@ import '../../core/widgets/product_card.dart';
 import '../../core/widgets/not_verified_widget.dart';
 import '../../core/services/user_profile_service.dart';
 import '../../core/services/product_service.dart';
+import '../../core/services/subscription_service.dart';
 import '../../core/services/address_manager.dart';
 import '../../core/services/address_service.dart';
 import 'products_detail_screen.dart';
+import 'products_after_subscription_screen.dart';
 
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
@@ -20,10 +22,10 @@ class ProductsScreen extends StatefulWidget {
 
 class _ProductsScreenState extends State<ProductsScreen> {
   String status = '';
+  String userId = '';
   bool isLoading = true;
   List<Product> products = [];
   String errorMessage = '';
-  final String defaultUserId = 'CR006000';
 
   @override
   void initState() {
@@ -44,14 +46,14 @@ class _ProductsScreenState extends State<ProductsScreen> {
   void _onAddressChanged(UserAddress? address) {
     // Clear product cache before loading new products
     // This ensures we don't get stale cached data
-    if (status == 'verified') {
+    if (status == 'verified' && userId.isNotEmpty) {
       // Force clear product cache for this user to prevent stale data
-      ProductService.instance.clearCache(userId: defaultUserId);
+      ProductService.instance.clearCache(userId: userId);
 
       // Add small delay to ensure cache is cleared before loading
       Future.delayed(const Duration(milliseconds: 100), () {
         if (mounted) {
-          _loadProducts(defaultUserId, address?.addressId);
+          _loadProducts(userId, address?.addressId);
         }
       });
     }
@@ -59,21 +61,20 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   Future<void> _loadUserProfile() async {
     try {
-      final result = await UserProfileService.instance.getUserProfile(
-        defaultUserId,
-      );
+      final result = await UserProfileService.instance.getCurrentUserProfile();
 
       if (result['success'] == true && result['data'] != null) {
         final data = result['data'];
         setState(() {
           status = data.status ?? '';
+          userId = data.userId ?? '';
         });
 
-        if (status == 'verified') {
-          await AddressManager.instance.loadDefaultAddress(defaultUserId);
+        if (status == 'verified' && userId.isNotEmpty) {
+          await AddressManager.instance.loadDefaultAddress(userId);
 
-          final selectedAddressId = AddressManager.instance.selectedAddressId;
-          await _loadProducts(defaultUserId, selectedAddressId);
+          // Check if user has subscription first
+          await _checkUserSubscription(userId);
         } else {
           setState(() {
             isLoading = false;
@@ -82,25 +83,66 @@ class _ProductsScreenState extends State<ProductsScreen> {
       } else {
         setState(() {
           status = '';
+          userId = '';
           isLoading = false;
         });
       }
     } catch (e) {
       setState(() {
         status = '';
+        userId = '';
         isLoading = false;
         errorMessage = 'Error loading profile: $e';
       });
     }
   }
 
-  Future<void> _loadProducts(String userId, int? addressId) async {
-    setState(() {
-      isLoading = true;
-      errorMessage = '';
-    });
-
+  Future<void> _checkUserSubscription(String userId) async {
     try {
+      final subscriptionResult = await SubscriptionService.instance
+          .getUserSubscriptions(userId);
+
+      if (subscriptionResult['success'] == true &&
+          subscriptionResult['data'] != null &&
+          subscriptionResult['data']['subscriptions'] != null &&
+          (subscriptionResult['data']['subscriptions'] as List).isNotEmpty) {
+        // User has subscription, navigate to after subscription screen
+        final subscriptions =
+            subscriptionResult['data']['subscriptions'] as List;
+        final currentPlan =
+            subscriptions.first['subsplanName']?.toString() ??
+            subscriptions.first['productDescription']?.toString() ??
+            'Current Plan';
+
+        print('ProductsScreen: Found subscription plan: $currentPlan');
+
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) =>
+                  ProductsAfterSubscriptionScreen(currentPlan: currentPlan),
+            ),
+          );
+        }
+      } else {
+        // No subscription, load products normally
+        final selectedAddressId = AddressManager.instance.selectedAddressId;
+        await _loadProducts(userId, selectedAddressId);
+      }
+    } catch (e) {
+      // If subscription check fails, fallback to normal product loading
+      final selectedAddressId = AddressManager.instance.selectedAddressId;
+      await _loadProducts(userId, selectedAddressId);
+    }
+  }
+
+  Future<void> _loadProducts(String userId, int? addressId) async {
+    try {
+      setState(() {
+        isLoading = true;
+        errorMessage = '';
+      });
+
       final result = await ProductService.instance.getProducts(
         userId: userId,
         addressId: addressId,
@@ -119,7 +161,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       }
     } catch (e) {
       setState(() {
-        errorMessage = 'Error loading products: $e';
+        errorMessage = 'Error loading products. Please try again.';
         isLoading = false;
       });
     }
@@ -249,10 +291,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                     final selectedAddressId = AddressManager
                                         .instance
                                         .selectedAddressId;
-                                    _loadProducts(
-                                      defaultUserId,
-                                      selectedAddressId,
-                                    );
+                                    _loadProducts(userId, selectedAddressId);
                                   },
                                   child: const Text('Retry'),
                                 ),

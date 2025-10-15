@@ -5,11 +5,14 @@ import '../../core/widgets/address_selector.dart';
 import '../../core/widgets/bill_card.dart';
 import '../../core/widgets/custom_gradient_header.dart';
 import '../../core/widgets/not_verified_widget.dart';
+import '../../core/widgets/no_plan_widget.dart';
 import '../../core/services/user_profile_service.dart';
-import '../../core/services/order_service.dart';
 import '../../core/services/bill_service.dart';
-import '../../core/models/order_summary.dart';
-import '../payment/payment_screen.dart';
+import 'bill_detail_screen.dart';
+import '../../core/services/subscription_service.dart';
+import '../../core/services/address_service.dart';
+import '../../core/services/auth_service.dart';
+import '../../core/models/bill_models.dart';
 
 class PayScreen extends StatefulWidget {
   const PayScreen({super.key});
@@ -20,85 +23,260 @@ class PayScreen extends StatefulWidget {
 
 class _PayScreenState extends State<PayScreen> {
   String status = '';
+  String userId = '';
   bool isLoading = true;
-  bool isPlacingOrder = false;
-  List<dynamic> billHistory = [];
-  Map<String, dynamic>? currentBill;
+  List<BillHistory> billHistory = [];
+  String errorMessage = '';
+  int? selectedAddressId;
+  String currentPlanName = ''; // Will be loaded from API
 
   @override
   void initState() {
     super.initState();
-    _loadUserProfile();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    // For testing, ensure we have a token
+    await _ensureAuthToken();
+
+    await _loadUserProfile();
+    if (status != 'not_verified') {
+      await _loadBillHistory();
+    }
+  }
+
+  Future<void> _ensureAuthToken() async {
+    try {
+      final authService = AuthService();
+      final token = await authService.getAuthToken();
+
+      if (token == null || token.isEmpty) {
+        // For testing, set a dummy token
+        // In production, this should redirect to login screen
+        print('No auth token found - user should login first');
+        // You might want to navigate to login screen here
+      }
+    } catch (e) {
+      print('Error checking auth token: $e');
+    }
   }
 
   Future<void> _loadUserProfile() async {
     try {
-      const String defaultUserId = 'CR006000';
-      final result = await UserProfileService.instance.getUserProfile(
-        defaultUserId,
-      );
+      final result = await UserProfileService.instance.getCurrentUserProfile();
 
       if (result['success'] == true && result['data'] != null) {
         final data = result['data'];
         setState(() {
           status = data.status ?? '';
+          userId = data.userId ?? '';
+          isLoading = false;
         });
-
-        // Load bills only if user is verified
-        if (status == 'verified') {
-          await _loadBillData(defaultUserId);
-        } else {
-          setState(() {
-            isLoading = false;
-          });
-        }
       } else {
         setState(() {
           status = '';
+          userId = '';
           isLoading = false;
         });
       }
     } catch (e) {
       setState(() {
         status = '';
+        userId = '';
         isLoading = false;
       });
     }
   }
 
-  Future<void> _loadBillData(String userId) async {
+  Future<void> _loadBillHistory() async {
     try {
-      final result = await BillService.instance.getBillHistory(userId: userId);
-
-      if (result['success'] == true && result['data'] != null) {
-        final data = result['data'] as Map<String, dynamic>;
-        final bills = data['bills'] as List<dynamic>? ?? [];
-
+      if (userId.isEmpty) {
         setState(() {
-          billHistory = bills;
-          // Get the latest unpaid bill as current bill
-          currentBill = bills.isNotEmpty
-              ? bills.firstWhere(
-                  (bill) =>
-                      bill['status'] == 'pending' || bill['status'] == 'unpaid',
-                  orElse: () => bills.first,
-                )
-              : null;
+          errorMessage = 'User ID not available';
           isLoading = false;
         });
+        return;
+      }
+
+      final addressResult = await AddressService.instance.getUserAddresses(
+        userId,
+      );
+
+      if (addressResult['success'] == true && addressResult['data'] != null) {
+        final List<UserAddress> addresses =
+            addressResult['data'] as List<UserAddress>;
+        if (addresses.isNotEmpty) {
+          selectedAddressId = addresses.first.addressId;
+
+          // Get bill history
+          final billRequest = BillHistoryRequest(
+            userId: userId,
+            userAddressId: selectedAddressId!,
+          );
+
+          final result = await BillService.instance.getBillHistory(billRequest);
+
+          if (result['success'] == true && result['data'] != null) {
+            setState(() {
+              billHistory = result['data'] as List<BillHistory>;
+              isLoading = false;
+            });
+
+            // Load plan name after getting bill history
+            await _loadCurrentPlanName();
+          } else {
+            // Fallback to subscription service if bill history fails
+            print('Bill history failed, trying subscription service...');
+            try {
+              final subscriptionResult = await SubscriptionService.instance
+                  .getUserSubscriptions(userId);
+              if (subscriptionResult['success'] == true &&
+                  subscriptionResult['data'] != null) {
+                final subscriptionBills = SubscriptionService.instance
+                    .convertSubscriptionsToBills(
+                      subscriptionResult['data'] as Map<String, dynamic>,
+                    );
+                setState(() {
+                  billHistory = subscriptionBills;
+                  isLoading = false;
+                });
+
+                // Load plan name after getting subscription bills
+                await _loadCurrentPlanName();
+              } else {
+                setState(() {
+                  errorMessage =
+                      result['message'] ??
+                      'Failed to load bill history and subscriptions';
+                  isLoading = false;
+                });
+              }
+            } catch (e) {
+              setState(() {
+                errorMessage = 'Error loading data: $e';
+                isLoading = false;
+              });
+            }
+          }
+        } else {
+          setState(() {
+            errorMessage = 'No address found';
+            isLoading = false;
+          });
+        }
       } else {
         setState(() {
-          billHistory = [];
-          currentBill = null;
+          errorMessage = 'Failed to load addresses';
           isLoading = false;
         });
       }
     } catch (e) {
       setState(() {
-        billHistory = [];
-        currentBill = null;
+        errorMessage = 'Error loading bill history: $e';
         isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadCurrentPlanName() async {
+    try {
+      if (userId.isNotEmpty && selectedAddressId != null) {
+        print('PayScreen: Loading subscription data for userId: $userId');
+
+        // Get subscription data to find the current plan name using subsplanName
+        final subscriptionResult = await SubscriptionService.instance
+            .getUserSubscriptions(userId);
+
+        print('PayScreen: Subscription API response: $subscriptionResult');
+
+        if (subscriptionResult['success'] == true &&
+            subscriptionResult['data'] != null) {
+          final subscriptionData =
+              subscriptionResult['data'] as Map<String, dynamic>;
+
+          print('PayScreen: Subscription data: $subscriptionData');
+
+          final subscriptions =
+              subscriptionData['subscriptions'] as List<dynamic>? ?? [];
+
+          print('PayScreen: Found ${subscriptions.length} subscriptions');
+
+          if (subscriptions.isNotEmpty) {
+            final currentSubscription = subscriptions.first;
+            print(
+              'PayScreen: Current subscription details: $currentSubscription',
+            );
+
+            // Priority: use subsplanName from subscription response
+            final planName =
+                currentSubscription['subsplanName']?.toString() ??
+                currentSubscription['productDescription']?.toString() ??
+                currentSubscription['plan_name']?.toString() ??
+                currentSubscription['name']?.toString();
+
+            print('PayScreen: Extracted plan name: $planName');
+
+            if (planName != null && planName.isNotEmpty) {
+              setState(() {
+                currentPlanName = planName;
+              });
+              print(
+                'PayScreen: Updated plan name from subscription to: $planName',
+              );
+              return;
+            } else {
+              print('PayScreen: No valid plan name found in subscription data');
+            }
+          } else {
+            print('PayScreen: No subscriptions found in response');
+          }
+        } else {
+          print('PayScreen: Subscription API failed or returned no data');
+          print('PayScreen: Success: ${subscriptionResult['success']}');
+          print('PayScreen: Message: ${subscriptionResult['message']}');
+        }
+      } else {
+        print(
+          'PayScreen: Cannot load plan name - userId: $userId, selectedAddressId: $selectedAddressId',
+        );
+      }
+    } catch (e) {
+      print('PayScreen: Error loading current plan name: $e');
+      // Keep default name if error occurs
+    }
+  }
+
+  void _handlePayPressed() {
+    // Get unpaid bill for payment
+    final unpaidBill = billHistory.where((bill) => !bill.isPaid).firstOrNull;
+
+    if (unpaidBill != null) {
+      // For now, show message that payment feature is coming soon
+      // In real implementation, you would navigate to payment gateway
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Payment for bill ${unpaidBill.invoiceId} - ${unpaidBill.formattedAmount}',
+          ),
+          backgroundColor: Colors.blue,
+          action: SnackBarAction(
+            label: 'Open Payment',
+            onPressed: () {
+              // TODO: Navigate to payment gateway or PaymentScreen
+              print('Open payment for invoice: ${unpaidBill.invoiceId}');
+              print('Midtrans Order ID: ${unpaidBill.midtransOrderId}');
+            },
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No unpaid bills found'),
+          backgroundColor: Colors.orange,
+        ),
+      );
     }
   }
 
@@ -126,25 +304,36 @@ class _PayScreenState extends State<PayScreen> {
             title: 'Pay',
             children: [
               AddressSelector(
-                userId: 'CR006000',
-                defaultAddress: 'Apartemen Mediterania Lt. 31 Unit 32AN',
+                userId: userId.isNotEmpty ? userId : '',
+                defaultAddress: '',
                 onTap: () {
                   // Handle address selection
                 },
               ),
               const SizedBox(height: 10),
-              BillCard(
-                planName: currentBill?['product_name'] ?? 'No Active Plan',
-                billLabel: 'Your Bill',
-                amount: currentBill != null
-                    ? 'Rp ${(currentBill!['amount'] ?? 0).toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}'
-                    : 'Rp 0',
-                status: currentBill?['status'] ?? 'none',
-                isProcessing: isPlacingOrder,
-                onPayPressed: currentBill != null && !isPlacingOrder
-                    ? _handlePay
-                    : null,
-              ),
+              // Show different BillCard based on bill history
+              billHistory.isEmpty
+                  ? const NoPlanWidget()
+                  : BillCard(
+                      planName: currentPlanName,
+                      billLabel: 'Your Bill',
+                      amount: billHistory.any((bill) => !bill.isPaid)
+                          ? billHistory
+                                .firstWhere((bill) => !bill.isPaid)
+                                .formattedAmount
+                          : billHistory.isNotEmpty
+                          ? billHistory.first.formattedAmount
+                          : 'Rp 0',
+                      status: billHistory.any((bill) => !bill.isPaid)
+                          ? 'UNPAID'
+                          : 'PAID',
+                      billData: billHistory.any((bill) => !bill.isPaid)
+                          ? billHistory.firstWhere((bill) => !bill.isPaid)
+                          : null,
+                      onPayPressed: billHistory.any((bill) => !bill.isPaid)
+                          ? _handlePayPressed
+                          : null,
+                    ),
             ],
           ),
 
@@ -180,85 +369,161 @@ class _PayScreenState extends State<PayScreen> {
                       ),
                     ],
                   ),
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
-                    itemCount: billHistory.length,
-                    separatorBuilder: (context, index) =>
-                        Divider(color: Colors.grey.shade300),
-                    itemBuilder: (context, index) {
-                      final bill = billHistory[index];
-                      final isPaid = bill['status'] == 'paid';
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _formatDate(
-                                      bill['created_at'] ??
-                                          bill['payment_deadline'] ??
-                                          '',
-                                    ),
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade600,
-                                      fontFamily: 'Open Sans',
+                  child: errorMessage.isNotEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.error_outline,
+                                  size: 48,
+                                  color: Colors.red.withOpacity(0.7),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  errorMessage,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.red,
+                                    fontFamily: 'Open Sans',
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      isLoading = true;
+                                      errorMessage = '';
+                                    });
+                                    _loadBillHistory();
+                                  },
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : billHistory.isEmpty
+                      ? const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.receipt_long,
+                                  size: 48,
+                                  color: Colors.grey,
+                                ),
+                                SizedBox(height: 16),
+                                Text(
+                                  'No payment history found',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey,
+                                    fontFamily: 'Open Sans',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          itemCount: billHistory.length,
+                          separatorBuilder: (context, index) =>
+                              Divider(color: Colors.grey.shade300),
+                          itemBuilder: (context, index) {
+                            final bill = billHistory[index];
+                            return GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => BillDetailScreen(
+                                      invoiceId: bill.invoiceId,
+                                      invoiceNumber: bill
+                                          .invoiceId, // Using invoiceId for now
+                                      date: bill.formattedDate,
+                                      amount: bill.formattedAmount,
+                                      status: bill.displayStatus,
                                     ),
                                   ),
-                                  const SizedBox(height: 4),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
+                                );
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            bill.formattedDate,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey.shade600,
+                                              fontFamily: 'Open Sans',
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: bill.isPaid
+                                                  ? const Color(0xFF82CBA3)
+                                                  : const Color(0xFFCB8282),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              bill.displayStatus,
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w600,
+                                                color: bill.isPaid
+                                                    ? const Color(0xFF1A451D)
+                                                    : const Color(0xFF451A1A),
+                                                fontFamily: 'Open Sans',
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                    decoration: BoxDecoration(
-                                      color: isPaid
-                                          ? const Color(0xFF82CBA3)
-                                          : const Color(0xFFCB8282),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      (bill['status'] ?? 'UNKNOWN')
-                                          .toString()
-                                          .toUpperCase(),
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                        color: isPaid
-                                            ? const Color(0xFF1A451D)
-                                            : const Color(0xFF451A1A),
+                                    Text(
+                                      bill.formattedAmount,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black,
                                         fontFamily: 'Open Sans',
                                       ),
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(width: 8),
+                                    const Icon(
+                                      Icons.arrow_forward_ios,
+                                      color: Colors.orange,
+                                      size: 16,
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                            Text(
-                              'Rp ${(bill['amount'] ?? 0).toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black,
-                                fontFamily: 'Open Sans',
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Icon(
-                              Icons.arrow_forward_ios,
-                              color: Colors.orange,
-                              size: 16,
-                            ),
-                          ],
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
                 ),
               ),
             ),
@@ -267,89 +532,5 @@ class _PayScreenState extends State<PayScreen> {
       ),
       bottomNavigationBar: const AppBottomNavigation(currentRoute: '/pay'),
     );
-  }
-
-  Future<void> _handlePay() async {
-    if (isPlacingOrder) {
-      return;
-    }
-    setState(() {
-      isPlacingOrder = true;
-    });
-
-    try {
-      const defaultUserId = 'CR006000';
-      const defaultProductId = 24;
-      const defaultAddressId = 1;
-      const defaultLevel = '2';
-      const defaultBlock = 'A';
-      const defaultUnitNumber = '201';
-
-      final result = await OrderService.instance.createOrder(
-        userId: defaultUserId,
-        productId: defaultProductId,
-        userAddressId: defaultAddressId,
-        level: defaultLevel,
-        block: defaultBlock,
-        unitNumber: defaultUnitNumber,
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      if (result['success'] == true && result['data'] is OrderSummary) {
-        final summary = result['data'] as OrderSummary;
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PaymentScreen(orderSummary: summary),
-          ),
-        );
-      } else {
-        final message = result['message']?.toString() ?? 'Gagal membuat order.';
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
-      }
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Terjadi kesalahan: $e')));
-    } finally {
-      if (mounted) {
-        setState(() {
-          isPlacingOrder = false;
-        });
-      }
-    }
-  }
-
-  String _formatDate(String dateString) {
-    if (dateString.isEmpty) return 'N/A';
-
-    try {
-      final date = DateTime.parse(dateString);
-      final months = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec',
-      ];
-      return '${date.day} ${months[date.month - 1]} ${date.year}';
-    } catch (e) {
-      return dateString; // Return original if parsing fails
-    }
   }
 }

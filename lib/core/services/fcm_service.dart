@@ -2,9 +2,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class FcmService {
-  static final FirebaseMessaging _firebaseMessaging =
-      FirebaseMessaging.instance;
-
+  static final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
+  
   /// Initialize FCM and request permission
   static Future<void> initialize() async {
     // Request permission for notifications
@@ -14,32 +13,32 @@ class FcmService {
       sound: true,
       provisional: false,
     );
-
+    
     // Get initial FCM token
     await getFcmToken();
-
+    
     // Listen for token refresh
     _firebaseMessaging.onTokenRefresh.listen((token) {
       _saveFcmToken(token);
     });
   }
-
+  
   /// Get FCM token from device
   static Future<String?> getFcmToken() async {
     try {
       String? token = await _firebaseMessaging.getToken();
-
+      
       if (token != null) {
         await _saveFcmToken(token);
       }
-
+      
       return token;
     } catch (e) {
       print('Error getting FCM token: $e');
       return null;
     }
   }
-
+  
   /// Save FCM token to local storage
   static Future<void> _saveFcmToken(String token) async {
     try {
@@ -50,7 +49,7 @@ class FcmService {
       print('Error saving FCM token: $e');
     }
   }
-
+  
   /// Get saved FCM token from local storage
   static Future<String?> getSavedFcmToken() async {
     try {
@@ -61,21 +60,21 @@ class FcmService {
       return null;
     }
   }
-
+  
   /// Get device FCM token for registration/login
   static Future<String> getTokenForRegistration() async {
     // Try to get fresh token
     String? token = await getFcmToken();
-
+    
     // If failed, try to get saved token
     if (token == null) {
       token = await getSavedFcmToken();
     }
-
+    
     // If still no token, return default/fallback
     return token ?? 'no-fcm-token-available';
   }
-
+  
   /// Handle foreground messages
   static void handleForegroundMessages() {
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
@@ -83,20 +82,18 @@ class FcmService {
       // Handle foreground notification here
     });
   }
-
+  
   /// Handle background messages
   static void handleBackgroundMessages() {
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   }
-
+  
   /// Background message handler
-  static Future<void> _firebaseMessagingBackgroundHandler(
-    RemoteMessage message,
-  ) async {
+  static Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     print('Received background message: ${message.notification?.title}');
     // Handle background notification here
   }
-
+  
   /// Subscribe to topic
   static Future<void> subscribeToTopic(String topic) async {
     try {
@@ -106,7 +103,7 @@ class FcmService {
       print('Error subscribing to topic: $e');
     }
   }
-
+  
   /// Unsubscribe from topic
   static Future<void> unsubscribeFromTopic(String topic) async {
     try {

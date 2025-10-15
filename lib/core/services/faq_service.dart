@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class FAQService {
-  static const String baseUrl = 'https://3580dc107926.ngrok-free.app/api/v1';
+  static const String baseUrl = 'https://6e4d717edb7b.ngrok-free.app/api/v1';
 
   // Cache variables
   static List<FAQ>? _cachedFAQs;

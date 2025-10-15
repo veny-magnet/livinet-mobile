@@ -4,7 +4,7 @@ import '../models/user_profile.dart';
 import 'auth_service.dart';
 
 class UserProfileService {
-  static const String baseUrl = 'https://3580dc107926.ngrok-free.app/api/v1';
+  static const String baseUrl = 'https://6e4d717edb7b.ngrok-free.app/api/v1';
 
   static UserProfileService? _instance;
   UserProfile? _cachedProfile;
@@ -127,6 +127,43 @@ class UserProfileService {
       return {
         'success': false,
         'message': 'Error fetching basic profile info: ${e.toString()}',
+        'data': null,
+      };
+    }
+  }
+
+  /// Get current user profile using auth token
+  Future<Map<String, dynamic>> getCurrentUserProfile() async {
+    try {
+      // Get auth token and current user data
+      final authService = AuthService();
+      final token = await authService.getAuthToken();
+      final currentUser = await authService.getCurrentUser();
+
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Authentication token not found. Please login again.',
+          'data': null,
+        };
+      }
+
+      if (currentUser == null || currentUser['user_id'] == null) {
+        return {
+          'success': false,
+          'message': 'User session not found. Please login again.',
+          'data': null,
+        };
+      }
+
+      // Use the user ID from current session
+      final userId = currentUser['user_id'] as String;
+      return await getUserProfile(userId);
+    } catch (e) {
+      print('UserProfileService - Error (current user): $e');
+      return {
+        'success': false,
+        'message': 'Error fetching current user profile: ${e.toString()}',
         'data': null,
       };
     }

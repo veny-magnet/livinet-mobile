@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/widgets/form_components.dart';
 import '../../core/widgets/app_bottom_navigation.dart';
+import '../../core/services/ticket_service.dart';
+import '../../core/services/auth_service.dart';
 
 class MakeTicketScreen extends StatefulWidget {
   const MakeTicketScreen({super.key});
@@ -12,6 +14,8 @@ class MakeTicketScreen extends StatefulWidget {
 class _MakeTicketScreenState extends State<MakeTicketScreen> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final TicketService _ticketService = TicketService.instance;
+  final AuthService _authService = AuthService();
   bool _isLoading = false;
 
   @override
@@ -21,7 +25,7 @@ class _MakeTicketScreenState extends State<MakeTicketScreen> {
     super.dispose();
   }
 
-  void _submitTicket() {
+  Future<void> _submitTicket() async {
     if (_titleController.text.isEmpty || _descriptionController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -36,20 +40,56 @@ class _MakeTicketScreenState extends State<MakeTicketScreen> {
       _isLoading = true;
     });
 
-    Future.delayed(const Duration(seconds: 2), () {
+    try {
+      final userInfo = await _authService.getCurrentUser();
+      final userId = userInfo?['user_id']?.toString();
+
+      if (userId == null) {
+        throw Exception('User ID not found. Please login again.');
+      }
+
+      final response = await _ticketService.openTicket(
+        userId: userId,
+        subject: _titleController.text,
+        message: _descriptionController.text,
+        date: DateTime.now().toIso8601String(),
+      );
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (response['success']) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ticket submitted successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Clear form
+        _titleController.clear();
+        _descriptionController.clear();
+
+        // Navigate back
+        Navigator.pop(context, true); // Pass true to indicate success
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to submit ticket: ${response['message']}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
       setState(() {
         _isLoading = false;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ticket submitted successfully!'),
-          backgroundColor: Colors.green,
-        ),
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
-
-      Navigator.pop(context);
-    });
+    }
   }
 
   @override

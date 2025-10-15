@@ -86,10 +86,7 @@ class _EditProfileScreenState extends State<EditProfileScreen>
 
   Future<void> _loadUserProfile() async {
     try {
-      const String defaultUserId = 'CR006000';
-      final result = await UserProfileService.instance.getUserProfile(
-        defaultUserId,
-      );
+      final result = await UserProfileService.instance.getCurrentUserProfile();
 
       if (result['success'] == true && result['data'] != null) {
         final data = result['data'];
