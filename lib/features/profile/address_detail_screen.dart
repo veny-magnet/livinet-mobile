@@ -91,21 +91,55 @@ class _AddressDetailScreenState extends State<AddressDetailScreen> {
     );
   }
 
-  void _updateAddress() {
-    // Clear product cache for this user when address is updated
-    ProductService.instance.clearCache(userId: widget.address.userId);
-
-    // Clear address cache to force refresh
-    AddressService.instance.clearCache(userId: widget.address.userId);
-
-    DialogHelper.showSuccess(
-      context,
-      title: 'Success',
-      message: 'Address updated successfully!',
-      onConfirm: () {
-        Navigator.of(context).pop(); // Go back to address list
-      },
+  void _updateAddress() async {
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
+
+    try {
+      final result = await AddressService.instance.updateAddress(
+        userId: widget.address.userId,
+        addressId: widget.address.addressId,
+        address: _addressController.text.trim(),
+      );
+
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      if (result['success'] == true) {
+        // Clear product cache for this user when address is updated
+        ProductService.instance.clearCache(userId: widget.address.userId);
+
+        DialogHelper.showSuccess(
+          context,
+          title: 'Success',
+          message: result['message'] ?? 'Address updated successfully!',
+          onConfirm: () {
+            Navigator.of(context).pop(); // Go back to address list
+          },
+        );
+      } else {
+        DialogHelper.showError(
+          context,
+          title: 'Error',
+          message: result['message'] ?? 'Failed to update address',
+          onConfirm: () {},
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      DialogHelper.showError(
+        context,
+        title: 'Error',
+        message: 'An error occurred: $e',
+        onConfirm: () {},
+      );
+    }
   }
 
   @override
@@ -170,24 +204,7 @@ class _AddressDetailScreenState extends State<AddressDetailScreen> {
                         const SizedBox(height: 8),
 
                         const Text(
-                          'Area Name',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black87,
-                            fontFamily: 'Open Sans',
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        _buildTextField(
-                          icon: Icons.location_city_outlined,
-                          hintText: "Area Name",
-                          controller: _areaController,
-                        ),
-                        const SizedBox(height: 12),
-
-                        const Text(
-                          'Address',
+                          'Address (Editable)',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
@@ -200,15 +217,34 @@ class _AddressDetailScreenState extends State<AddressDetailScreen> {
                           icon: Icons.home_outlined,
                           hintText: "Full Address",
                           controller: _addressController,
+                          maxLines: 3,
                         ),
                         const SizedBox(height: 12),
 
                         const Text(
-                          'City',
+                          'Area (Read Only)',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
-                            color: Colors.black87,
+                            color: Colors.grey,
+                            fontFamily: 'Open Sans',
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        _buildTextField(
+                          icon: Icons.location_city_outlined,
+                          hintText: "Area Name",
+                          controller: _areaController,
+                          enabled: false,
+                        ),
+                        const SizedBox(height: 12),
+
+                        const Text(
+                          'City (Read Only)',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey,
                             fontFamily: 'Open Sans',
                           ),
                         ),
@@ -217,15 +253,16 @@ class _AddressDetailScreenState extends State<AddressDetailScreen> {
                           icon: Icons.location_city,
                           hintText: "City",
                           controller: _cityController,
+                          enabled: false,
                         ),
                         const SizedBox(height: 12),
 
                         const Text(
-                          'State',
+                          'State (Read Only)',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
-                            color: Colors.black87,
+                            color: Colors.grey,
                             fontFamily: 'Open Sans',
                           ),
                         ),
@@ -234,15 +271,16 @@ class _AddressDetailScreenState extends State<AddressDetailScreen> {
                           icon: Icons.map_outlined,
                           hintText: "State",
                           controller: _stateController,
+                          enabled: false,
                         ),
                         const SizedBox(height: 12),
 
                         const Text(
-                          'Postcode',
+                          'Postcode (Read Only)',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
-                            color: Colors.black87,
+                            color: Colors.grey,
                             fontFamily: 'Open Sans',
                           ),
                         ),
@@ -252,15 +290,16 @@ class _AddressDetailScreenState extends State<AddressDetailScreen> {
                           hintText: "Postcode",
                           controller: _postcodeController,
                           keyboardType: TextInputType.number,
+                          enabled: false,
                         ),
                         const SizedBox(height: 12),
 
                         const Text(
-                          'Country',
+                          'Country (Read Only)',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
-                            color: Colors.black87,
+                            color: Colors.grey,
                             fontFamily: 'Open Sans',
                           ),
                         ),
@@ -269,10 +308,40 @@ class _AddressDetailScreenState extends State<AddressDetailScreen> {
                           icon: Icons.public_outlined,
                           hintText: "Country",
                           controller: _countryController,
+                          enabled: false,
                         ),
                         const SizedBox(height: 24),
 
-                        // Space for bottom button
+                        // Info Note
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.blue.shade200),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                color: Colors.blue.shade600,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Only the address field can be modified. To change location (city, state, area), please delete this address and create a new one.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.blue.shade700,
+                                    fontFamily: 'Open Sans',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ), // Space for bottom button
                         const SizedBox(height: 100),
                       ],
                     ),

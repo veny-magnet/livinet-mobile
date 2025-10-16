@@ -4,6 +4,7 @@ import '../../core/services/product_service.dart';
 import '../../core/widgets/confirmation_dialog.dart';
 import '../../core/widgets/address_card.dart';
 import 'address_detail_screen.dart';
+import 'add_address_screen.dart';
 
 class AddressScreen extends StatefulWidget {
   final String userId;
@@ -56,81 +57,15 @@ class _AddressScreenState extends State<AddressScreen> {
   }
 
   void _showAddAddressDialog() {
-    final addressController = TextEditingController();
-    final postcodeController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Add New Address'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: addressController,
-                  decoration: const InputDecoration(
-                    labelText: 'Address',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: postcodeController,
-                  decoration: const InputDecoration(
-                    labelText: 'Postcode',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Note: City, State, and Area selection will be added in future updates.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-
-                // Clear product cache for this user when new address is added
-                ProductService.instance.clearCache(userId: widget.userId);
-
-                // Clear address cache to force refresh
-                AddressService.instance.clearCache(userId: widget.userId);
-
-                DialogHelper.showSuccess(
-                  context,
-                  title: 'Success',
-                  message: 'Address added successfully!',
-                  onConfirm: () {
-                    // Refresh the address list
-                    _loadAddresses();
-                  },
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4CB04C),
-              ),
-              child: const Text('Add'),
-            ),
-          ],
-        );
-      },
-    );
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddAddressScreen(userId: widget.userId),
+      ),
+    ).then((_) {
+      // Refresh list when returning from add screen
+      _loadAddresses();
+    });
   }
 
   void _showDeleteConfirmation(UserAddress address) {
@@ -147,22 +82,55 @@ class _AddressScreenState extends State<AddressScreen> {
     );
   }
 
-  void _deleteAddress(UserAddress address) {
-    // Clear product cache for this user when address is deleted
-    ProductService.instance.clearCache(userId: widget.userId);
-
-    // Clear address cache to force refresh
-    AddressService.instance.clearCache(userId: widget.userId);
-
-    DialogHelper.showSuccess(
-      context,
-      title: 'Success',
-      message: 'Address deleted successfully!',
-      onConfirm: () {
-        // Refresh the address list
-        _loadAddresses();
-      },
+  void _deleteAddress(UserAddress address) async {
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
+
+    try {
+      final result = await AddressService.instance.deleteAddress(
+        userId: widget.userId,
+        addressId: address.addressId,
+      );
+
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      if (result['success'] == true) {
+        // Clear product cache for this user when address is deleted
+        ProductService.instance.clearCache(userId: widget.userId);
+
+        DialogHelper.showSuccess(
+          context,
+          title: 'Success',
+          message: result['message'] ?? 'Address deleted successfully!',
+          onConfirm: () {
+            // Refresh the address list
+            _loadAddresses();
+          },
+        );
+      } else {
+        DialogHelper.showError(
+          context,
+          title: 'Error',
+          message: result['message'] ?? 'Failed to delete address',
+          onConfirm: () {},
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      DialogHelper.showError(
+        context,
+        title: 'Error',
+        message: 'An error occurred: $e',
+        onConfirm: () {},
+      );
+    }
   }
 
   @override

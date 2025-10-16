@@ -64,7 +64,7 @@ class UserAddress {
 }
 
 class AddressService {
-  static const String baseUrl = 'https://6e4d717edb7b.ngrok-free.app/api/v1';
+  static const String baseUrl = 'https://7c3591ea9167.ngrok-free.app/api/v1';
 
   static AddressService? _instance;
   Map<String, List<UserAddress>> _cachedAddressesByUser = {};
@@ -209,5 +209,254 @@ class AddressService {
   Future<Map<String, dynamic>> refreshAddresses(String userId) async {
     clearCache(userId: userId);
     return await getUserAddresses(userId);
+  }
+
+  /// Update existing address
+  Future<Map<String, dynamic>> updateAddress({
+    required String userId,
+    required int addressId,
+    required String address,
+  }) async {
+    try {
+      // Get auth token
+      final authService = AuthService();
+      final token = await authService.getAuthToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Authentication token not found',
+          'data': null,
+        };
+      }
+
+      final body = {
+        'user_id': userId,
+        'address_id': addressId,
+        'address': address,
+      };
+
+      print('AddressService - Updating address with body: $body');
+
+      final response = await http.put(
+        Uri.parse('$baseUrl/update/updateaddress'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'ngrok-skip-browser-warning': 'true',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(body),
+      );
+
+      print('AddressService - Update response status: ${response.statusCode}');
+      print('AddressService - Update response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+        if (responseData['code'] == 200 && responseData['success'] == true) {
+          // Clear cache to force refresh
+          clearCache(userId: userId);
+
+          return {
+            'success': true,
+            'data': responseData['data'],
+            'message':
+                responseData['message'] ?? 'Address updated successfully',
+          };
+        } else {
+          return {
+            'success': false,
+            'message': responseData['message'] ?? 'Failed to update address',
+            'data': null,
+          };
+        }
+      } else if (response.statusCode == 401) {
+        return {
+          'success': false,
+          'message': 'Authentication failed. Please login again.',
+          'data': null,
+        };
+      } else {
+        return {
+          'success': false,
+          'message': 'Server error: ${response.statusCode}',
+          'data': null,
+        };
+      }
+    } catch (e) {
+      print('AddressService - Error updating address: $e');
+      return {
+        'success': false,
+        'message': 'Network error: ${e.toString()}',
+        'data': null,
+      };
+    }
+  }
+
+  /// Add new address
+  Future<Map<String, dynamic>> addAddress({
+    required String userId,
+    required String address,
+    required int cityId,
+    required int stateId,
+    required int areaId,
+    required String postcode,
+  }) async {
+    try {
+      // Get auth token
+      final authService = AuthService();
+      final token = await authService.getAuthToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Authentication token not found',
+          'data': null,
+        };
+      }
+
+      final body = {
+        'user_id': userId,
+        'address': address,
+        'city_id': cityId,
+        'state_id': stateId,
+        'area_id': areaId,
+        'postcode': postcode,
+      };
+
+      print('AddressService - Adding address with body: $body');
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/add/address'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'ngrok-skip-browser-warning': 'true',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(body),
+      );
+
+      print('AddressService - Add response status: ${response.statusCode}');
+      print('AddressService - Add response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+        if (responseData['code'] == 200 && responseData['success'] == true) {
+          // Clear cache to force refresh
+          clearCache(userId: userId);
+
+          return {
+            'success': true,
+            'data': responseData['data'],
+            'message': responseData['message'] ?? 'Address added successfully',
+          };
+        } else {
+          return {
+            'success': false,
+            'message': responseData['message'] ?? 'Failed to add address',
+            'data': null,
+          };
+        }
+      } else if (response.statusCode == 401) {
+        return {
+          'success': false,
+          'message': 'Authentication failed. Please login again.',
+          'data': null,
+        };
+      } else {
+        return {
+          'success': false,
+          'message': 'Server error: ${response.statusCode}',
+          'data': null,
+        };
+      }
+    } catch (e) {
+      print('AddressService - Error adding address: $e');
+      return {
+        'success': false,
+        'message': 'Network error: ${e.toString()}',
+        'data': null,
+      };
+    }
+  }
+
+  /// Delete address
+  Future<Map<String, dynamic>> deleteAddress({
+    required String userId,
+    required int addressId,
+  }) async {
+    try {
+      // Get auth token
+      final authService = AuthService();
+      final token = await authService.getAuthToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Authentication token not found',
+          'data': null,
+        };
+      }
+
+      final body = {'user_id': userId, 'address_id': addressId};
+
+      print('AddressService - Deleting address with body: $body');
+
+      final response = await http.delete(
+        Uri.parse('$baseUrl/delete/deleteaddress'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'ngrok-skip-browser-warning': 'true',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(body),
+      );
+
+      print('AddressService - Delete response status: ${response.statusCode}');
+      print('AddressService - Delete response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+        if (responseData['code'] == 200 && responseData['success'] == true) {
+          // Clear cache to force refresh
+          clearCache(userId: userId);
+
+          return {
+            'success': true,
+            'data': responseData['data'],
+            'message':
+                responseData['message'] ?? 'Address deleted successfully',
+          };
+        } else {
+          return {
+            'success': false,
+            'message': responseData['message'] ?? 'Failed to delete address',
+            'data': null,
+          };
+        }
+      } else if (response.statusCode == 401) {
+        return {
+          'success': false,
+          'message': 'Authentication failed. Please login again.',
+          'data': null,
+        };
+      } else {
+        return {
+          'success': false,
+          'message': 'Server error: ${response.statusCode}',
+          'data': null,
+        };
+      }
+    } catch (e) {
+      print('AddressService - Error deleting address: $e');
+      return {
+        'success': false,
+        'message': 'Network error: ${e.toString()}',
+        'data': null,
+      };
+    }
   }
 }

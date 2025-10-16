@@ -82,46 +82,77 @@ class UserProfile {
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
+    // Print received JSON for debugging
+    print('UserProfile.fromJson received: ${json.keys}');
+    
     return UserProfile(
-      id: json['id'] ?? 0,
-      userId: json['user_id'] ?? '',
-      username: json['username'] ?? '',
-      phone: json['phone'] ?? '',
-      email: json['email'] ?? '',
-      emailVerifiedAt: json['email_verified_at'],
-      country: json['country'] ?? '',
-      status: json['status'] ?? '',
-      referralCode: json['referral_code'],
-      points: json['points'] ?? 0,
-      ktp: json['ktp'],
-      createdAt: json['created_at'] ?? '',
-      updatedAt: json['updated_at'] ?? '',
-      fcmToken: json['fcm_token'],
-      province: json['province'],
-      city: json['city'],
-      nationalIdNumber: json['national_id_number'],
-      fullName: json['full_name'],
-      firstName: json['first_name'],
-      lastName: json['last_name'],
-      birthPlace: json['birth_place'],
-      birthDate: json['birth_date'],
-      gender: json['gender'],
-      address: json['address'],
-      rt: json['rt'],
-      rw: json['rw'],
-      village: json['village'],
-      district: json['district'],
-      religion: json['religion'],
-      maritalStatus: json['marital_status'],
-      occupation: json['occupation'],
-      citizenship: json['citizenship'],
-      validUntil: json['valid_until'],
-      whmcsId: json['whmcs_id'],
-      npwp: json['npwp'],
-      emailverified: json['emailverified'] ?? 0,
-      datecreated: json['datecreated'] ?? '',
-      whmcsStatus: json['whmcs_status'] ?? '',
+      id: _safeGet(json, 'id', 0),
+      userId: _safeGet(json, 'user_id', ''),
+      username: _safeGet(json, 'username', ''),
+      phone: _safeGet(json, 'phone', ''),
+      email: _safeGet(json, 'email', ''),
+      emailVerifiedAt: _safeGet(json, 'email_verified_at', null),
+      country: _safeGet(json, 'country', ''),
+      status: _safeGet(json, 'status', ''),
+      referralCode: _safeGet(json, 'referral_code', null),
+      points: _safeGet(json, 'points', 0),
+      ktp: _safeGet(json, 'ktp', null),
+      createdAt: _safeGet(json, 'created_at', ''),
+      updatedAt: _safeGet(json, 'updated_at', ''),
+      fcmToken: _safeGet(json, 'fcm_token', null),
+      province: _safeGet(json, 'province', null),
+      city: _safeGet(json, 'city', null),
+      nationalIdNumber: _safeGet(json, 'national_id_number', null),
+      fullName: _safeGet(json, 'full_name', null),
+      firstName: _safeGet(json, 'first_name', null),
+      lastName: _safeGet(json, 'last_name', null),
+      birthPlace: _safeGet(json, 'birth_place', null),
+      birthDate: _safeGet(json, 'birth_date', null),
+      gender: _safeGet(json, 'gender', null),
+      address: _safeGet(json, 'address', null),
+      rt: _safeGet(json, 'rt', null),
+      rw: _safeGet(json, 'rw', null),
+      village: _safeGet(json, 'village', null),
+      district: _safeGet(json, 'district', null),
+      religion: _safeGet(json, 'religion', null),
+      maritalStatus: _safeGet(json, 'marital_status', null),
+      occupation: _safeGet(json, 'occupation', null),
+      citizenship: _safeGet(json, 'citizenship', null),
+      validUntil: _safeGet(json, 'valid_until', null),
+      whmcsId: _safeGet(json, 'whmcs_id', null),
+      npwp: _safeGet(json, 'npwp', null),
+      emailverified: _safeGet(json, 'emailverified', 0),
+      datecreated: _safeGet(json, 'datecreated', ''),
+      whmcsStatus: _safeGet(json, 'whmcs_status', ''),
     );
+  }
+
+  /// Safe getter method to avoid "doesn't exist" errors
+  static T _safeGet<T>(Map<String, dynamic> json, String key, T defaultValue) {
+    try {
+      if (json.containsKey(key)) {
+        final value = json[key];
+        if (value == null) return defaultValue;
+        if (value is T) return value;
+        
+        // Type conversion for common cases
+        if (T == String && value is! String) {
+          return value.toString() as T;
+        }
+        if (T == int && value is String) {
+          return int.tryParse(value) as T? ?? defaultValue;
+        }
+        if (T == int && value is double) {
+          return value.toInt() as T;
+        }
+        
+        return value as T;
+      }
+      return defaultValue;
+    } catch (e) {
+      print('UserProfile._safeGet error for key "$key": $e');
+      return defaultValue;
+    }
   }
 
   Map<String, dynamic> toJson() {

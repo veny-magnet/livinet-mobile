@@ -1,9 +1,77 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../services/user_profile_service.dart';
+import '../models/user_profile.dart';
 
-class ProfileHeader extends StatelessWidget {
-  const ProfileHeader({super.key});
+class ProfileHeader extends StatefulWidget {
+  final VoidCallback? onRefresh;
+
+  const ProfileHeader({super.key, this.onRefresh});
+
+  @override
+  State<ProfileHeader> createState() => _ProfileHeaderState();
+}
+
+class _ProfileHeaderState extends State<ProfileHeader> {
+  UserProfile? _profile;
+  bool _isLoading = true;
+  String _errorMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = '';
+      });
+
+      final result = await UserProfileService.instance.getCurrentUserProfile();
+
+      if (result['success'] == true && result['data'] != null) {
+        setState(() {
+          _profile = result['data'] as UserProfile;
+          _isLoading = false;
+        });
+
+        // Call onRefresh callback if provided
+        widget.onRefresh?.call();
+      } else {
+        setState(() {
+          _errorMessage = result['message'] ?? 'Failed to load profile';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error loading profile: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _copyUserId() {
+    if (_profile?.userId != null) {
+      Clipboard.setData(ClipboardData(text: _profile!.userId));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User ID copied to clipboard'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  /// Public method to refresh profile from outside
+  void refreshProfile() {
+    _loadProfile();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,60 +151,103 @@ class ProfileHeader extends StatelessWidget {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 // Username
-                                const Text(
-                                  'Adlan MS',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black,
-                                    fontFamily: 'Open Sans',
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
+                                _isLoading
+                                    ? Container(
+                                        width: 120,
+                                        height: 24,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.shade300,
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
+                                        ),
+                                      )
+                                    : Text(
+                                        _profile?.username ?? 'Unknown User',
+                                        style: const TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black,
+                                          fontFamily: 'Open Sans',
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
 
-                                const SizedBox(height: 0),
+                                const SizedBox(height: 4),
 
                                 // User ID with copy icon
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      'CR00501',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.black.withOpacity(0.7),
-                                        fontFamily: 'Open Sans',
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    GestureDetector(
-                                      onTap: () {
-                                        Clipboard.setData(
-                                          const ClipboardData(
-                                            text: '2501983452',
+                                _isLoading
+                                    ? Container(
+                                        width: 80,
+                                        height: 16,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.shade300,
+                                          borderRadius: BorderRadius.circular(
+                                            4,
                                           ),
-                                        );
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'ID copied to clipboard',
+                                        ),
+                                      )
+                                    : Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            _profile?.userId ?? 'Unknown ID',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              color: Colors.black.withOpacity(
+                                                0.7,
+                                              ),
+                                              fontFamily: 'Open Sans',
                                             ),
-                                            duration: Duration(seconds: 2),
-                                            behavior: SnackBarBehavior.floating,
                                           ),
-                                        );
-                                      },
-                                      child: Icon(
-                                        Icons.content_copy_outlined,
-                                        size: 16,
-                                        color: Colors.black.withOpacity(0.7),
+                                          const SizedBox(width: 8),
+                                          GestureDetector(
+                                            onTap: _copyUserId,
+                                            child: Icon(
+                                              Icons.content_copy_outlined,
+                                              size: 16,
+                                              color: Colors.black.withOpacity(
+                                                0.7,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
+
+                                // Error message with retry if any
+                                if (_errorMessage.isNotEmpty && !_isLoading)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: Column(
+                                      children: [
+                                        Text(
+                                          'Failed to load profile',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.red.shade600,
+                                            fontFamily: 'Open Sans',
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        GestureDetector(
+                                          onTap: _loadProfile,
+                                          child: Text(
+                                            'Tap to retry',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.blue.shade600,
+                                              fontFamily: 'Open Sans',
+                                              decoration:
+                                                  TextDecoration.underline,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
+                                  ),
                               ],
                             ),
                           ),

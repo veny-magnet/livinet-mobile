@@ -1,7 +1,6 @@
 import '../models/state_model.dart';
 import '../models/city_model.dart';
 import '../models/area_model.dart';
-import '../models/api_response.dart';
 import 'base_api_service.dart';
 
 class LocationService extends BaseApiService {

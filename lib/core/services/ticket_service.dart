@@ -15,24 +15,35 @@ class TicketService {
     try {
       print('TicketService: Fetching ticket history for userId: $userId');
 
-      final response = await _apiService.get(
+      final response = await _apiService.get<Map<String, dynamic>>(
         '/get/tickethistory',
         queryParams: {'user_id': userId},
+        fromJson: (json) => json as Map<String, dynamic>,
       );
 
-      print('TicketService: Ticket history response: ${response.data}');
+      print('TicketService: Raw API response success: ${response.success}');
+      print('TicketService: Raw API response message: ${response.message}');
+      print('TicketService: Raw API response data: ${response.data}');
 
       if (response.success && response.data != null) {
+        // Handle both direct data response and nested response
+        Map<String, dynamic> responseData;
+        if (response.data is Map<String, dynamic>) {
+          responseData = response.data as Map<String, dynamic>;
+        } else {
+          responseData = {'data': response.data};
+        }
+
         return {
           'success': true,
           'message': response.message,
-          'data': response.data,
+          'data': responseData,
         };
       } else {
         return {'success': false, 'message': response.message, 'data': null};
       }
     } catch (e) {
-      print('TicketService: Error fetching ticket history: $e');
+      print('TicketService: Exception in getTicketHistory: $e');
       return {
         'success': false,
         'message': 'Failed to get ticket history: $e',
@@ -51,9 +62,10 @@ class TicketService {
         'TicketService: Fetching ticket detail for userId: $userId, ticketId: $ticketId',
       );
 
-      final response = await _apiService.get(
+      final response = await _apiService.get<Map<String, dynamic>>(
         '/get/ticketdetail',
         queryParams: {'user_id': userId, 'ticketid': ticketId},
+        fromJson: (json) => json as Map<String, dynamic>,
       );
 
       print('TicketService: Ticket detail response: ${response.data}');
@@ -110,11 +122,17 @@ class TicketService {
 
       print('TicketService: Request body: $body');
 
-      final response = await _apiService.post('/post/ticketopen', body: body);
+      final response = await _apiService.post<Map<String, dynamic>>(
+        '/post/ticketopen',
+        body: body,
+        fromJson: (json) => json as Map<String, dynamic>,
+      );
 
-      print('TicketService: Open ticket response: ${response.data}');
+      print('TicketService: Open ticket response success: ${response.success}');
+      print('TicketService: Open ticket response message: ${response.message}');
+      print('TicketService: Open ticket response data: ${response.data}');
 
-      if (response.success && response.data != null) {
+      if (response.success) {
         return {
           'success': true,
           'message': response.message,
@@ -144,14 +162,15 @@ class TicketService {
       print('TicketService: Code: $code');
       print('TicketService: Message: $message');
 
-      final response = await _apiService.post(
+      final response = await _apiService.post<Map<String, dynamic>>(
         '/post/ticketreply',
         body: {'code': code, 'ticketid': ticketId, 'message': message},
+        fromJson: (json) => json as Map<String, dynamic>,
       );
 
       print('TicketService: Reply ticket response: ${response.data}');
 
-      if (response.success && response.data != null) {
+      if (response.success) {
         return {
           'success': true,
           'message': response.message,
@@ -175,28 +194,65 @@ class TicketService {
     try {
       final tickets = <Map<String, dynamic>>[];
 
-      if (response['data'] != null) {
-        final data = response['data'];
+      print('TicketService: Parsing response: $response');
 
-        if (data['tickets'] is List) {
-          final ticketList = data['tickets'] as List;
+      // Handle both nested data response and direct data
+      dynamic dataSection = response['data'];
 
-          for (final ticket in ticketList) {
-            if (ticket is Map<String, dynamic>) {
-              tickets.add({
-                'ticketid': ticket['ticketid']?.toString() ?? '',
-                'tid': ticket['tid']?.toString() ?? '',
-                'title': ticket['ticketTitle']?.toString() ?? '',
-                'description': ticket['ticketDesc']?.toString() ?? '',
-                'date': ticket['date']?.toString() ?? '',
-                'status': ticket['status']?.toString() ?? 'Open',
-              });
-            }
+      // If data is the response itself (contains tickets directly)
+      if (dataSection != null && dataSection['tickets'] is List) {
+        final ticketList = dataSection['tickets'] as List;
+        print(
+          'TicketService: Found ${ticketList.length} tickets in data.tickets',
+        );
+
+        for (final ticket in ticketList) {
+          if (ticket is Map<String, dynamic>) {
+            final parsedTicket = {
+              'ticketid': ticket['ticketid']?.toString() ?? '',
+              'tid': ticket['tid']?.toString() ?? '',
+              'title': ticket['ticketTitle']?.toString() ?? '',
+              'description': ticket['ticketDesc']?.toString() ?? '',
+              'date': ticket['date']?.toString() ?? '',
+              'status': ticket['status']?.toString() ?? 'Open',
+            };
+            print('TicketService: Parsed ticket: $parsedTicket');
+            tickets.add(parsedTicket);
           }
         }
       }
+      // Handle case where response itself contains tickets array
+      else if (response['tickets'] is List) {
+        final ticketList = response['tickets'] as List;
+        print(
+          'TicketService: Found ${ticketList.length} tickets in response.tickets',
+        );
 
-      print('TicketService: Parsed ${tickets.length} tickets');
+        for (final ticket in ticketList) {
+          if (ticket is Map<String, dynamic>) {
+            final parsedTicket = {
+              'ticketid': ticket['ticketid']?.toString() ?? '',
+              'tid': ticket['tid']?.toString() ?? '',
+              'title': ticket['ticketTitle']?.toString() ?? '',
+              'description': ticket['ticketDesc']?.toString() ?? '',
+              'date': ticket['date']?.toString() ?? '',
+              'status': ticket['status']?.toString() ?? 'Open',
+            };
+            print('TicketService: Parsed ticket: $parsedTicket');
+            tickets.add(parsedTicket);
+          }
+        }
+      } else {
+        print('TicketService: Warning - No tickets array found in response');
+        print('TicketService: Response keys: ${response.keys}');
+        if (dataSection != null) {
+          print(
+            'TicketService: Data section keys: ${(dataSection as Map).keys}',
+          );
+        }
+      }
+
+      print('TicketService: Final parsed tickets count: ${tickets.length}');
       return tickets;
     } catch (e) {
       print('TicketService: Error parsing ticket history: $e');

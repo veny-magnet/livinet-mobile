@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'auth_service.dart';
 
 class PasswordResetService {
-  static const String baseUrl = 'https://6e4d717edb7b.ngrok-free.app/api/v1';
+  static const String baseUrl = 'https://7c3591ea9167.ngrok-free.app/api/v1';
   static const String apiServer = 'LIVINET_API_SERVER';
   static const String apiKey = 'LIVINET_API_KEY_12345';
   static PasswordResetService? _instance;

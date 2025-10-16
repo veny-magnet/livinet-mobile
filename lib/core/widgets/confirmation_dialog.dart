@@ -335,4 +335,23 @@ class DialogHelper {
       ),
     );
   }
+
+  static Future<void> showInfo(
+    BuildContext context, {
+    required String title,
+    required String message,
+    required VoidCallback onConfirm,
+    String confirmText = 'OK',
+  }) {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => ConfirmationDialog.success(
+        title: title,
+        message: message,
+        onConfirm: onConfirm,
+        confirmText: confirmText,
+      ),
+    );
+  }
 }

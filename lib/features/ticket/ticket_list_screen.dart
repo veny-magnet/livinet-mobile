@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'make_ticket_screen.dart';
+import 'ticket_detail_screen.dart';
 import '../../core/services/ticket_service.dart';
 import '../../core/services/auth_service.dart';
 
@@ -197,7 +198,7 @@ class _TicketListScreenState extends State<TicketListScreen>
                   ),
                   tabs: const [
                     Tab(text: 'Ongoing'),
-                    Tab(text: 'History'),
+                    Tab(text: 'Completed'),
                   ],
                 ),
                 Container(
@@ -218,7 +219,7 @@ class _TicketListScreenState extends State<TicketListScreen>
                     indicatorSize: TabBarIndicatorSize.tab,
                     tabs: const [
                       Tab(text: 'Ongoing'),
-                      Tab(text: 'History'),
+                      Tab(text: 'Completed'),
                     ],
                   ),
                 ),
@@ -230,7 +231,7 @@ class _TicketListScreenState extends State<TicketListScreen>
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: [_buildOngoingTab(), _buildHistoryTab()],
+              children: [_buildOngoingTab(), _buildAnsweredTab()],
             ),
           ),
         ],
@@ -278,7 +279,7 @@ class _TicketListScreenState extends State<TicketListScreen>
     }
 
     final ongoingTickets = tickets
-        .where((ticket) => ticket['status']?.toLowerCase() != 'closed')
+        .where((ticket) => ticket['status']?.toLowerCase() == 'open')
         .toList();
 
     if (ongoingTickets.isEmpty) {
@@ -334,7 +335,7 @@ class _TicketListScreenState extends State<TicketListScreen>
     );
   }
 
-  Widget _buildHistoryTab() {
+  Widget _buildAnsweredTab() {
     if (isLoading) {
       return const Center(
         child: CircularProgressIndicator(
@@ -373,19 +374,19 @@ class _TicketListScreenState extends State<TicketListScreen>
       );
     }
 
-    final closedTickets = tickets
-        .where((ticket) => ticket['status']?.toLowerCase() == 'closed')
+    final answeredTickets = tickets
+        .where((ticket) => ticket['status']?.toLowerCase() == 'answered')
         .toList();
 
-    if (closedTickets.isEmpty) {
+    if (answeredTickets.isEmpty) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.history, color: Colors.grey, size: 64),
+            Icon(Icons.question_answer, color: Colors.grey, size: 64),
             SizedBox(height: 16),
             Text(
-              'No ticket history',
+              'No answered tickets',
               style: TextStyle(color: Colors.grey, fontSize: 16),
             ),
           ],
@@ -410,18 +411,18 @@ class _TicketListScreenState extends State<TicketListScreen>
         ),
         child: ListView.separated(
           padding: const EdgeInsets.all(16),
-          itemCount: closedTickets.length,
+          itemCount: answeredTickets.length,
           separatorBuilder: (context, index) =>
               Divider(color: Colors.grey.shade300, height: 24, thickness: 1),
           itemBuilder: (context, index) {
-            final ticket = closedTickets[index];
+            final ticket = answeredTickets[index];
             return _buildTicketItem(
               ticketId: ticket['ticketid'] ?? '',
               date: _ticketService.formatTicketDate(ticket['date']),
               time: '',
               title: ticket['title'] ?? 'No Title',
               description: ticket['description'] ?? 'No Description',
-              status: ticket['status'] ?? 'Closed',
+              status: ticket['status'] ?? 'Answered',
               isOngoing: false,
             );
           },
@@ -511,22 +512,12 @@ class _TicketListScreenState extends State<TicketListScreen>
   }
 
   void _showTicketDetail(String ticketId) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Ticket Detail'),
-          content: Text(
-            'Ticket detail for ID: $ticketId\n\nTicket detail screen will be implemented soon.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            TicketDetailScreen(ticketId: ticketId, title: 'Ticket Detail'),
+      ),
     );
   }
 }

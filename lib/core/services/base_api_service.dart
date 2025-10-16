@@ -15,7 +15,7 @@ class ApiException implements Exception {
 }
 
 class BaseApiService {
-  static const String baseUrl = 'https://6e4d717edb7b.ngrok-free.app/api/v1';
+  static const String baseUrl = 'https://7c3591ea9167.ngrok-free.app/api/v1';
 
   // These should be configured according to your Laravel API requirements
   static const String nameServer = 'LIVINET_API_SERVER';
@@ -63,6 +63,36 @@ class BaseApiService {
 
       final requestHeaders = await _getHeaders(additionalHeaders: headers);
       final response = await http.get(uri, headers: requestHeaders);
+
+      return _handleResponse<T>(response, fromJson);
+    } on SocketException {
+      throw ApiException('No internet connection');
+    } on HttpException {
+      throw ApiException('HTTP error occurred');
+    } catch (e) {
+      throw ApiException('Unexpected error: $e');
+    }
+  }
+
+  Future<ApiResponse<T>> getWithBody<T>(
+    String endpoint, {
+    Map<String, dynamic>? body,
+    Map<String, String>? headers,
+    T Function(dynamic)? fromJson,
+  }) async {
+    try {
+      final requestHeaders = await _getHeaders(additionalHeaders: headers);
+
+      // Create HTTP request manually to send body with GET method
+      final request = http.Request('GET', Uri.parse('$baseUrl$endpoint'));
+      request.headers.addAll(requestHeaders);
+
+      if (body != null) {
+        request.body = jsonEncode(body);
+      }
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
 
       return _handleResponse<T>(response, fromJson);
     } on SocketException {

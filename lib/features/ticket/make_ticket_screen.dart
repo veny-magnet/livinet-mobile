@@ -3,6 +3,8 @@ import '../../core/widgets/form_components.dart';
 import '../../core/widgets/app_bottom_navigation.dart';
 import '../../core/services/ticket_service.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/address_service.dart';
+import '../../core/services/subscription_service.dart';
 
 class MakeTicketScreen extends StatefulWidget {
   const MakeTicketScreen({super.key});
@@ -16,6 +18,8 @@ class _MakeTicketScreenState extends State<MakeTicketScreen> {
   final _descriptionController = TextEditingController();
   final TicketService _ticketService = TicketService.instance;
   final AuthService _authService = AuthService();
+  final AddressService _addressService = AddressService.instance;
+  final SubscriptionService _subscriptionService = SubscriptionService.instance;
   bool _isLoading = false;
 
   @override
@@ -48,11 +52,53 @@ class _MakeTicketScreenState extends State<MakeTicketScreen> {
         throw Exception('User ID not found. Please login again.');
       }
 
+      // Get user's address and subscription info
+      String? userAddressId;
+      String? subsPlanId;
+
+      try {
+        // Get default address
+        final addressResponse = await _addressService.getUserAddresses(userId);
+        if (addressResponse['success'] && addressResponse['data'] != null) {
+          final addresses = addressResponse['data']['user_addresses'] as List?;
+          if (addresses != null && addresses.isNotEmpty) {
+            // Use first address as default (you can modify this logic)
+            userAddressId = addresses.first['id']?.toString();
+          }
+        }
+      } catch (e) {
+        print('Failed to get address: $e');
+        // Continue without address - it's optional
+      }
+
+      try {
+        // Get active subscription
+        final subscriptionResponse = await _subscriptionService
+            .getUserSubscriptions(userId);
+        if (subscriptionResponse['success'] &&
+            subscriptionResponse['data'] != null) {
+          final subscriptions =
+              subscriptionResponse['data']['subscriptions'] as List?;
+          if (subscriptions != null && subscriptions.isNotEmpty) {
+            // Use first subscription as default (you can modify this logic)
+            subsPlanId = subscriptions.first['subsplanID']?.toString();
+          }
+        }
+      } catch (e) {
+        print('Failed to get subscription: $e');
+        // Continue without subscription - it's optional
+      }
+
       final response = await _ticketService.openTicket(
         userId: userId,
         subject: _titleController.text,
         message: _descriptionController.text,
-        date: DateTime.now().toIso8601String(),
+        userAddressId: userAddressId,
+        subsPlanId: subsPlanId,
+        date: DateTime.now()
+            .toIso8601String()
+            .replaceFirst('T', ' ')
+            .substring(0, 19),
       );
 
       setState(() {

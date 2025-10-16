@@ -48,7 +48,7 @@ class ProductDetail {
 }
 
 class ProductDetailService {
-  static const String baseUrl = 'https://6e4d717edb7b.ngrok-free.app/api/v1';
+  static const String baseUrl = 'https://7c3591ea9167.ngrok-free.app/api/v1';
 
   static ProductDetailService? _instance;
   Map<int, ProductDetail> _cachedDetails = {};

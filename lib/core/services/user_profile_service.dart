@@ -4,7 +4,7 @@ import '../models/user_profile.dart';
 import 'auth_service.dart';
 
 class UserProfileService {
-  static const String baseUrl = 'https://6e4d717edb7b.ngrok-free.app/api/v1';
+  static const String baseUrl = 'https://7c3591ea9167.ngrok-free.app/api/v1';
 
   static UserProfileService? _instance;
   UserProfile? _cachedProfile;
@@ -59,19 +59,33 @@ class UserProfileService {
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
 
+        print('UserProfileService - Response structure: ${responseData.keys}');
+        print('UserProfileService - Full response: $responseData');
+
         if (responseData['code'] == 200 && responseData['payload'] != null) {
           final profileData = responseData['payload']['profile'];
 
-          // Cache the profile
-          _cachedProfile = UserProfile.fromJson(profileData);
-          _lastFetch = DateTime.now();
+          print('UserProfileService - Profile data: $profileData');
 
-          return {
-            'success': true,
-            'data': _cachedProfile,
-            'message':
-                responseData['message'] ?? 'Profile fetched successfully',
-          };
+          try {
+            // Cache the profile with error handling
+            _cachedProfile = UserProfile.fromJson(profileData);
+            _lastFetch = DateTime.now();
+
+            return {
+              'success': true,
+              'data': _cachedProfile,
+              'message':
+                  responseData['message'] ?? 'Profile fetched successfully',
+            };
+          } catch (e) {
+            print('UserProfileService - Error parsing profile: $e');
+            return {
+              'success': false,
+              'message': 'Error parsing profile data: $e',
+              'data': null,
+            };
+          }
         } else {
           return {
             'success': false,
