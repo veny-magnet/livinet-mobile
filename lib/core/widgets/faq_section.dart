@@ -21,12 +21,20 @@ class _FAQSectionState extends State<FAQSection> {
   }
 
   Future<void> _loadFAQs({bool forceRefresh = false}) async {
-    // Only show loading if we don't have cached data
-    if (FAQService.getCacheInfo()['hasCachedData'] == false || forceRefresh) {
+    if (forceRefresh) {
       setState(() {
         isLoading = true;
         errorMessage = null;
       });
+    } else {
+      // Check cache asynchronously
+      final cacheInfo = await FAQService.getCacheInfo();
+      if (cacheInfo['hasCachedData'] == false) {
+        setState(() {
+          isLoading = true;
+          errorMessage = null;
+        });
+      }
     }
 
     try {

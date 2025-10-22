@@ -2,11 +2,12 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../models/order_models.dart';
 import '../models/bill_models.dart';
+import '../models/order_detail_models.dart' as order_detail;
 import '../services/order_service.dart';
 import '../services/auth_service.dart';
 import '../services/address_service.dart';
 import '../services/product_service.dart';
-import '../services/bill_service.dart';
+import '../services/order_details_service.dart';
 import '../../features/payment/payment_screen.dart';
 
 class BillCard extends StatefulWidget {
@@ -17,6 +18,11 @@ class BillCard extends StatefulWidget {
   final BillHistory? billData;
   final VoidCallback? onPayPressed;
   final bool isProcessing;
+  final bool useOrderDetails;
+  final String? userId;
+  final int? userAddressId;
+  final order_detail.OrderDetail?
+  orderDetailData; // Store OrderDetail when provided
 
   const BillCard({
     super.key,
@@ -27,7 +33,35 @@ class BillCard extends StatefulWidget {
     this.billData,
     this.onPayPressed,
     this.isProcessing = false,
+    this.useOrderDetails = false,
+    this.userId,
+    this.userAddressId,
+    this.orderDetailData,
   });
+
+  /// Constructor to create BillCard from OrderDetail
+  /// This maintains the existing display but uses OrderDetail data internally
+  factory BillCard.fromOrderDetail({
+    required order_detail.OrderDetail orderDetail,
+    String? userId,
+    int? userAddressId,
+    VoidCallback? onPayPressed,
+    bool isProcessing = false,
+  }) {
+    return BillCard(
+      planName: orderDetail.serviceName,
+      billLabel: orderDetail.serviceGroup,
+      amount: orderDetail.formattedAmount,
+      status: orderDetail.displayStatus,
+      billData: null,
+      onPayPressed: onPayPressed,
+      isProcessing: isProcessing,
+      useOrderDetails: true,
+      userId: userId,
+      userAddressId: userAddressId,
+      orderDetailData: orderDetail,
+    );
+  }
 
   @override
   State<BillCard> createState() => _BillCardState();
@@ -35,6 +69,201 @@ class BillCard extends StatefulWidget {
 
 class _BillCardState extends State<BillCard> {
   bool _isProcessingPayment = false;
+  final OrderDetailsService _orderDetailsService = OrderDetailsService();
+  order_detail.OrderDetail? _currentOrderDetail;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.useOrderDetails && widget.userId != null) {
+      _loadOrderDetails();
+    }
+  }
+
+  /// Load order details as additional data source
+  Future<void> _loadOrderDetails() async {
+    if (widget.userId == null) return;
+
+    try {
+      final response = await _orderDetailsService.getOrderDetails(
+        userId: widget.userId!,
+        userAddressId: widget.userAddressId,
+      );
+
+      if (response != null && response.orders.isNotEmpty) {
+        // Find matching order based on plan name or amount
+        final matchingOrder = response.orders.where((order) {
+          return order.serviceName.toLowerCase().contains(
+                widget.planName.toLowerCase(),
+              ) ||
+              order.formattedAmount == widget.amount;
+        }).firstOrNull;
+
+        if (matchingOrder != null) {
+          setState(() {
+            _currentOrderDetail = matchingOrder;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading order details: $e');
+      // Fallback to existing BillHistory data - no error shown to user
+    }
+  }
+
+  /// Create mock OrderResponse from OrderDetail for payment compatibility
+  OrderResponse _createOrderResponseFromOrderDetail(
+    order_detail.OrderDetail orderDetail,
+  ) {
+    return OrderResponse(
+      productId: orderDetail.productData.productId,
+      productName: orderDetail.serviceName,
+      productPrice: orderDetail.productData.productPrice,
+      productDetail: orderDetail.serviceGroup,
+      subsplanId: orderDetail.productData.subsplanId,
+      subsplanName: orderDetail.productData.subsplanName,
+      paymentDeadline: orderDetail.statusData.paymentDeadline ?? '',
+      status: orderDetail.statusData.orderStatus,
+      invoiceStatus: orderDetail.invoiceStatus,
+      orderStatus: orderDetail.statusData.orderStatus,
+      code: orderDetail.orderCode ?? '',
+      amount: orderDetail.invoiceAmount,
+      midtransLink: MidtransLink(
+        token: orderDetail.midtransData.midtransToken,
+        redirectUrl: orderDetail.midtransData.midtransRedirectUrl,
+      ),
+      midtransClient: orderDetail.midtransData.midtransClientKey,
+      merchantBaseUrl: orderDetail.midtransData.midtransMerchantBaseUrl,
+      midtransOrderId: orderDetail.midtransData.midtransOrderId,
+      data: {
+        'order': {
+          'invoice': {
+            'subtotal': orderDetail.invoiceDetails.subtotal,
+            'tax': orderDetail.invoiceDetails.tax,
+            'taxrate': orderDetail.invoiceDetails.taxRate,
+            'credit': orderDetail.invoiceDetails.credit,
+            'total': orderDetail.invoiceDetails.total,
+          },
+        },
+        'services': [
+          {'billingcycle': orderDetail.billingCycle},
+        ],
+      },
+    );
+  }
+
+  /// Fallback method to handle bill payment using old flow (create order from bill)
+  Future<void> _handleBillPaymentFallback() async {
+    if (widget.billData == null) return;
+
+    try {
+      // Get current user data
+      final authService = AuthService();
+      final userData = await authService.getCurrentUser();
+
+      if (userData == null || userData['user_id'] == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please login first to make payment'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Get user addresses to use in order
+      final addressResult = await AddressService.instance.getUserAddresses(
+        userData['user_id'],
+      );
+
+      if (addressResult['success'] != true || addressResult['data'] == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              addressResult['message'] ?? 'Failed to get user addresses',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      final addresses = addressResult['data'] as List<UserAddress>;
+      if (addresses.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No addresses found. Please add an address first.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Show dialog to collect level, block, unitNumber for bill payment
+      final orderDetails = await _showBillPaymentDialog();
+      if (orderDetails == null) {
+        return; // User cancelled
+      }
+
+      // Use bill's userAddressId if available, otherwise use first address
+      final userAddressId =
+          widget.billData!.userAddressId ?? addresses.first.addressId;
+
+      // Get product ID from API based on bill context
+      final productId = await _getProductIdForBill(
+        userData['user_id'],
+        userAddressId,
+      );
+
+      // Create order request for existing bill payment
+      final orderRequest = OrderRequest(
+        userId: userData['user_id'],
+        productId: productId,
+        userAddressId: userAddressId,
+        level: orderDetails['level']!,
+        block: orderDetails['block']!,
+        unitNumber: orderDetails['unitNumber']!,
+      );
+
+      // Call real API to create order
+      final result = await OrderService.instance.createOrder(orderRequest);
+
+      if (result['success'] == true && result['data'] != null) {
+        final orderResponse = result['data'] as OrderResponse;
+
+        // Clear caches to ensure fresh data after payment
+        ProductService.instance.clearCache(userId: userData['user_id']);
+
+        // Navigate to payment screen with real API response
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                PaymentScreen.fromOrderResponse(orderResponse: orderResponse),
+          ),
+        ).then((_) {
+          // Additional refresh when returning from payment screen
+          if (mounted) {
+            // Trigger a rebuild of parent widgets if needed
+            setState(() {});
+          }
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              result['message'] ?? 'Failed to create payment order',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
 
   /// Get appropriate product ID for bill payment
   Future<int> _getProductIdForBill(String userId, int userAddressId) async {
@@ -172,131 +401,103 @@ class _BillCardState extends State<BillCard> {
   }
 
   Future<void> _handlePayment() async {
-    if (widget.billData == null) {
-      // Fallback to original onPayPressed if no bill data
-      if (widget.onPayPressed != null) {
-        widget.onPayPressed!();
+    // Priority 1: Use OrderDetail data directly passed from constructor
+    if (widget.orderDetailData != null && !widget.orderDetailData!.isPaid) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PaymentScreen.fromOrderDetail(
+            orderDetail: widget.orderDetailData!,
+          ),
+        ),
+      ).then((_) {
+        // Refresh data after payment
+        if (mounted) {
+          setState(() {});
+        }
+      });
+      return;
+    }
+
+    // Priority 2: Use loaded OrderDetail data from API
+    if (_currentOrderDetail != null && !_currentOrderDetail!.isPaid) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              PaymentScreen.fromOrderDetail(orderDetail: _currentOrderDetail!),
+        ),
+      ).then((_) {
+        // Refresh data after payment
+        if (mounted) {
+          _loadOrderDetails();
+          setState(() {});
+        }
+      });
+      return;
+    }
+
+    // Priority 3: Try to load OrderDetails for BillHistory data
+    if (widget.billData != null && widget.userId != null) {
+      setState(() {
+        _isProcessingPayment = true;
+      });
+
+      try {
+        // Try to get OrderDetails for this bill
+        final response = await _orderDetailsService.getOrderDetails(
+          userId: widget.userId!,
+          userAddressId: widget.userAddressId,
+        );
+
+        if (response != null && response.orders.isNotEmpty) {
+          // Find matching order for this bill
+          final matchingOrder = response.orders.where((order) {
+            return order.midtransOrderId == widget.billData!.midtransOrderId ||
+                (order.formattedAmount == widget.amount && !order.isPaid);
+          }).firstOrNull;
+
+          if (matchingOrder != null && !matchingOrder.isPaid) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) =>
+                    PaymentScreen.fromOrderDetail(orderDetail: matchingOrder),
+              ),
+            ).then((_) {
+              if (mounted) {
+                _loadOrderDetails();
+                setState(() {});
+              }
+            });
+            return;
+          }
+        }
+
+        // If no OrderDetails found, fallback to old flow (create order from bill)
+        await _handleBillPaymentFallback();
+      } catch (e) {
+        print('Error loading OrderDetails for bill: $e');
+        // Fallback to old flow if OrderDetails loading fails
+        await _handleBillPaymentFallback();
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isProcessingPayment = false;
+          });
+        }
       }
       return;
+    }
+
+    // Fallback to original onPayPressed if no bill data
+    if (widget.onPayPressed != null) {
+      widget.onPayPressed!();
     }
 
     setState(() {
       _isProcessingPayment = true;
     });
-
-    try {
-      // Get current user data
-      final authService = AuthService();
-      final userData = await authService.getCurrentUser();
-
-      if (userData == null || userData['user_id'] == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please login first to make payment'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      // Get user addresses to use in order
-      final addressResult = await AddressService.instance.getUserAddresses(
-        userData['user_id'],
-      );
-
-      if (addressResult['success'] != true || addressResult['data'] == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              addressResult['message'] ?? 'Failed to get user addresses',
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      final addresses = addressResult['data'] as List<UserAddress>;
-      if (addresses.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No addresses found. Please add an address first.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      // Show dialog to collect level, block, unitNumber for bill payment
-      final orderDetails = await _showBillPaymentDialog();
-      if (orderDetails == null) {
-        return; // User cancelled
-      }
-
-      // Use bill's userAddressId if available, otherwise use first address
-      final userAddressId =
-          widget.billData!.userAddressId ?? addresses.first.addressId;
-
-      // Get product ID from API based on bill context
-      final productId = await _getProductIdForBill(
-        userData['user_id'],
-        userAddressId,
-      );
-
-      // Create order request for existing bill payment
-      final orderRequest = OrderRequest(
-        userId: userData['user_id'],
-        productId: productId,
-        userAddressId: userAddressId,
-        level: orderDetails['level']!,
-        block: orderDetails['block']!,
-        unitNumber: orderDetails['unitNumber']!,
-      );
-
-      // Call real API to create order
-      final result = await OrderService.instance.createOrder(orderRequest);
-
-      if (result['success'] == true && result['data'] != null) {
-        final orderResponse = result['data'] as OrderResponse;
-
-        // Clear caches to ensure fresh data after payment
-        ProductService.instance.clearCache(userId: userData['user_id']);
-        BillService.instance.clearCache(userId: userData['user_id']);
-
-        // Navigate to payment screen with real API response
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PaymentScreen(orderResponse: orderResponse),
-          ),
-        ).then((_) {
-          // Additional refresh when returning from payment screen
-          if (mounted) {
-            // Trigger a rebuild of parent widgets if needed
-            setState(() {});
-          }
-        });
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              result['message'] ?? 'Failed to create payment order',
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isProcessingPayment = false;
-        });
-      }
-    }
   }
 
   @override

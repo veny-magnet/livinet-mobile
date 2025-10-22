@@ -13,7 +13,6 @@ class UpgradeCareWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -35,61 +34,56 @@ class UpgradeCareWidget extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'You\'re on $currentPlan.',
+                  'You\'re on $currentPlan. Want faster speeds?',
                   style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                    fontSize: 15,
                     color: Colors.black87,
                     fontFamily: 'Open Sans',
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
-                RichText(
-                  text: const TextSpan(
+                ShaderMask(
+                  shaderCallback: (bounds) => const LinearGradient(
+                    colors: [Color(0xFF41AD49), Color(0xFFFCBF0F)],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ).createShader(bounds),
+                  child: const Text(
+                    'Upgrade your plan.',
                     style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
                       fontFamily: 'Open Sans',
+                      color: Colors.white,
                     ),
-                    children: [
-                      TextSpan(
-                        text: 'Want faster speeds? ',
-                        style: TextStyle(color: Colors.black54),
-                      ),
-                      TextSpan(
-                        text: 'Upgrade your plan.',
-                        style: TextStyle(
-                          color: Color(0xFF4CB04C),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 const SizedBox(height: 12),
-                SizedBox(
-                  height: 36,
-                  child: ElevatedButton(
-                    onPressed: onUpgradePressed,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4CB04C),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 8,
-                      ),
+                ElevatedButton(
+                  onPressed: onUpgradePressed,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4CB04C),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
                     ),
-                    child: const Text(
-                      'Upgrade',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'Open Sans',
-                      ),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 8,
+                    ),
+                    minimumSize: const Size(0, 36),
+                  ),
+                  child: const Text(
+                    'Upgrade',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Open Sans',
                     ),
                   ),
                 ),

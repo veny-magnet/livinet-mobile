@@ -4,6 +4,8 @@ import '../../core/widgets/app_text_input.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/fcm_service.dart';
+import '../../core/services/app_initializer.dart';
+import '../../core/services/push_notification_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -41,53 +43,44 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _onLogin(BuildContext context) async {
     if (_isLoading) return;
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-    
-    // Basic validation
-    if (email.isEmpty || password.isEmpty) {
-      _showError('Email and password are required');
-      return;
-    }
-    
-    // Email format validation
-    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
-      _showError('Email must be in format: example@domain.com');
-      return;
-    }
-    
+
     setState(() {
       _isLoading = true;
-      _loadingMessage = 'Signing in...';
+      _loadingMessage = 'Signing in';
     });
-    
+
     try {
-      // Get FCM token
       String fcmToken = await FcmService.getTokenForRegistration();
+
       final result = await _authService.login(
-        email: email,
-        password: password,
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
         fcmToken: fcmToken,
       );
-      
+
       if (result['success']) {
-        _showSuccess('Login successful!');
-        context.go('/home');
-      } else {
-        // Handle specific error messages
-        String errorMessage = result['message'] ?? 'Login failed';
-        
-        // Check for specific error types
-        if (errorMessage.toLowerCase().contains('unauthorised') || 
-            errorMessage.toLowerCase().contains('unauthorized')) {
-          _showError('Wrong email or password');
-        } else if (errorMessage.toLowerCase().contains('validation error')) {
-          _showError('Email must be in format: example@domain.com');
-        } else if (errorMessage.toLowerCase().contains('verify')) {
-          _showError('Please verify your email first');
-        } else {
-          _showError(errorMessage);
+        // Initialize app data in parallel
+        setState(() => _loadingMessage = 'Signing in');
+
+        final initResult = await AppInitializer.instance.initialize();
+
+        // Subscribe to push notification topics after successful login
+        final currentUser = await _authService.getCurrentUser();
+        if (currentUser != null && currentUser['user_id'] != null) {
+          final userId = currentUser['user_id'] as String;
+          setState(() => _loadingMessage = 'Signing in');
+          await PushNotificationService.instance.subscribeToUserTopics(userId);
         }
+
+        if (initResult['success']) {
+          _showSuccess('Login successful!');
+          context.go('/home');
+        } else {
+          _showError('Login successful but failed to load data');
+          context.go('/home'); // Still navigate but with error
+        }
+      } else {
+        // Handle error...
       }
     } catch (e) {
       _showError('Login error: $e');
@@ -108,7 +101,10 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          Positioned(top: -30, left: 0, right: 0,
+          Positioned(
+            top: -30,
+            left: 0,
+            right: 0,
             child: Image.asset(
               "assets/images/top_gradient.png",
               fit: BoxFit.cover,
@@ -117,7 +113,11 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
 
-          Positioned( bottom: -30, left: 0, right: 0, child: Image.asset(
+          Positioned(
+            bottom: -30,
+            left: 0,
+            right: 0,
+            child: Image.asset(
               "assets/images/bottom_gradient.png",
               fit: BoxFit.cover,
               width: double.infinity,
@@ -134,13 +134,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 40),
                   const Text(
                     "Welcome Back!",
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.green,),
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.green,
+                    ),
                     textAlign: TextAlign.left,
                   ),
                   const SizedBox(height: 10),
                   Text(
                     "Login to your account",
-                    style: TextStyle(fontSize: 14,color: c.onSurface,),
+                    style: TextStyle(fontSize: 14, color: c.onSurface),
                     textAlign: TextAlign.left,
                   ),
 
@@ -154,14 +158,23 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  SizedBox(height: 54, width: double.infinity,
-                    child: TextField(controller: _passwordController, obscureText: _obscurePassword,
+                  SizedBox(
+                    height: 54,
+                    width: double.infinity,
+                    child: TextField(
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
                       decoration: InputDecoration(
-                        prefixIcon: const Icon(Icons.lock_outline, color: borderColor),
+                        prefixIcon: const Icon(
+                          Icons.lock_outline,
+                          color: borderColor,
+                        ),
                         hintText: "Password",
                         hintStyle: const TextStyle(color: borderColor),
                         contentPadding: const EdgeInsets.symmetric(
-                            vertical: 0, horizontal: 16),
+                          vertical: 0,
+                          horizontal: 16,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(25),
                           borderSide: const BorderSide(color: borderColor),
@@ -199,16 +212,25 @@ class _LoginScreenState extends State<LoginScreen> {
                       onPressed: () {
                         context.go('/forgotpass');
                       },
-                      style: TextButton.styleFrom( padding: EdgeInsets.zero, minimumSize: const Size(0, 0), tapTargetSize: MaterialTapTargetSize.shrinkWrap,),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(0, 0),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
                       child: const Text(
                         "Forgot Password?",
-                        style: TextStyle(color: Colors.green, fontWeight: FontWeight.w900, ),
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ),
                   ),
 
                   const SizedBox(height: 30),
-                  AppButton( text: _isLoading ? "Signing in..." : "Login",  onPressed: _isLoading ? null : () => _onLogin(context),
+                  AppButton(
+                    text: _isLoading ? "Signing in..." : "Login",
+                    onPressed: _isLoading ? null : () => _onLogin(context),
                     isPrimary: true,
                   ),
 
@@ -252,11 +274,17 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.green)),
+                    const CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                    ),
                     const SizedBox(height: 20),
                     Text(
                       _loadingMessage,
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),

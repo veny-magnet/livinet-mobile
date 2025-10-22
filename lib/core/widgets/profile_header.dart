@@ -76,7 +76,7 @@ class _ProfileHeaderState extends State<ProfileHeader> {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 280,
+      height: 274,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -94,7 +94,7 @@ class _ProfileHeaderState extends State<ProfileHeader> {
 
           // Gradient Overlay
           Container(
-            height: 211,
+            height: 205,
             width: double.infinity,
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -117,7 +117,7 @@ class _ProfileHeaderState extends State<ProfileHeader> {
                   children: [
                     // Blur Container with User Info
                     Positioned(
-                      top: 88,
+                      top: 85, // Reduced from 88 to 85
                       left: (screenWidth - 300) / 2,
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
@@ -125,10 +125,10 @@ class _ProfileHeaderState extends State<ProfileHeader> {
                           filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
                           child: Container(
                             width: 300,
-                            height: 150,
+                            height: 145, // Reduced from 150 to 145
                             padding: const EdgeInsets.only(
-                              top: 70,
-                              bottom: 20,
+                              top: 65, // Reduced from 70 to 65
+                              bottom: 18, // Reduced from 20 to 18
                               left: 20,
                               right: 20,
                             ),
@@ -165,15 +165,17 @@ class _ProfileHeaderState extends State<ProfileHeader> {
                                     : Text(
                                         _profile?.username ?? 'Unknown User',
                                         style: const TextStyle(
-                                          fontSize: 24,
+                                          fontSize: 22,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.black,
                                           fontFamily: 'Open Sans',
                                           letterSpacing: 0.5,
                                         ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
 
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 2),
 
                                 // User ID with copy icon
                                 _isLoading
@@ -257,11 +259,11 @@ class _ProfileHeaderState extends State<ProfileHeader> {
 
                     // Profile Picture Circle
                     Positioned(
-                      top: 40,
-                      left: (screenWidth - 110) / 2,
+                      top: 38, // Reduced from 40 to 38
+                      left: (screenWidth - 105) / 2, // Reduced from 110 to 105
                       child: Container(
-                        width: 110,
-                        height: 110,
+                        width: 105, // Reduced from 110 to 105
+                        height: 105, // Reduced from 110 to 105
                         decoration: BoxDecoration(
                           color: Colors.white,
                           shape: BoxShape.circle,
@@ -283,7 +285,7 @@ class _ProfileHeaderState extends State<ProfileHeader> {
                                 color: Colors.grey.shade200,
                                 child: Icon(
                                   Icons.person,
-                                  size: 60,
+                                  size: 55, // Reduced from 60 to 55
                                   color: Colors.grey.shade400,
                                 ),
                               );

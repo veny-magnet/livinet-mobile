@@ -1,5 +1,8 @@
 import '../services/base_api_service.dart';
 import '../models/bill_models.dart';
+import '../cache/cache_manager.dart';
+import '../cache/cache.dart';
+import 'app_logger.dart';
 
 class BillService {
   static final BillService _instance = BillService._internal();
@@ -8,11 +11,10 @@ class BillService {
   BillService._internal();
 
   final BaseApiService _apiService = BaseApiService();
+  final _logger = AppLogger.instance;
+  final _cacheManager = CacheManager.instance;
 
-  // Cache management
-  final Map<String, List<BillHistory>> _cachedBills = {};
-  final Map<String, DateTime> _lastFetch = {};
-  static const Duration _cacheExpiry = Duration(minutes: 5);
+  static const String CACHE_VERSION = '1.0.0';
 
   // Add proper headers with authentication
   Map<String, String> _getHeaders(String? token) {
@@ -31,24 +33,48 @@ class BillService {
     try {
       final cacheKey = 'bills_${request.userId}_${request.userAddressId}';
 
-      // Check cache first (unless force refresh)
-      if (!forceRefresh && _cachedBills.containsKey(cacheKey)) {
-        final lastFetch = _lastFetch[cacheKey];
-        if (lastFetch != null &&
-            DateTime.now().difference(lastFetch) < _cacheExpiry) {
-          print('Returning cached bill history for: $cacheKey');
+      // Determine cache duration based on status
+      // Unpaid bills: 10 min fresh (can change when paid)
+      // Paid bills: 1 hour fresh (won't change)
+      final isPaidQuery = request.toString().contains('paid');
+      final freshDuration = isPaidQuery
+          ? const Duration(hours: 1)
+          : const Duration(minutes: 10);
+
+      final cacheConfig = CacheConfig(
+        maxAge: freshDuration,
+        staleAge: const Duration(hours: 2),
+        strategy: CacheStrategy.staleWhileRevalidate,
+        version: CACHE_VERSION,
+      );
+
+      // Try cache first (unless force refresh)
+      if (!forceRefresh) {
+        final cached = await _cacheManager.get<List<BillHistory>>(
+          cacheKey,
+          cacheConfig,
+          (json) {
+            final billsData = json['bills'] as List;
+            return billsData
+                .map(
+                  (item) => BillHistory.fromJson(item as Map<String, dynamic>),
+                )
+                .toList();
+          },
+        );
+
+        if (cached != null && !cached.isExpired(cacheConfig.maxAge)) {
+          _logger.debug('Cache HIT: $cacheKey');
           return {
             'success': true,
-            'message': 'Bills fetched from cache',
-            'data': _cachedBills[cacheKey] ?? <BillHistory>[],
+            'message': 'Bills from cache',
+            'data': cached.data,
             'source': 'cache',
           };
         }
       }
 
-      print(
-        'Requesting bill history for user: ${request.userId}, address: ${request.userAddressId}',
-      );
+      _logger.debug('Cache MISS, fetching from API: $cacheKey');
 
       final response = await _apiService.get<List<BillHistory>>(
         '/get/billhistory',
@@ -58,7 +84,7 @@ class BillService {
           'user_address_id': request.userAddressId.toString(),
         },
         fromJson: (json) {
-          print('Raw API response: $json');
+          _logger.debug('Raw API response: $json');
           try {
             List<dynamic> billsData;
 
@@ -70,7 +96,7 @@ class BillService {
               // Direct array response: [{...}, {...}]
               billsData = json;
             } else {
-              print('Unexpected response structure: $json');
+              _logger.warning('Unexpected response structure: $json');
               return <BillHistory>[];
             }
 
@@ -80,10 +106,10 @@ class BillService {
                 )
                 .toList();
 
-            print('Parsed ${bills.length} bills successfully');
+            _logger.debug('Parsed ${bills.length} bills successfully');
             return bills;
           } catch (e) {
-            print('Error parsing bill history: $e');
+            _logger.error('Error parsing bill history', e);
             return <BillHistory>[];
           }
         },
@@ -92,8 +118,10 @@ class BillService {
       if (response.success) {
         // Update cache
         final bills = response.data ?? <BillHistory>[];
-        _cachedBills[cacheKey] = bills;
-        _lastFetch[cacheKey] = DateTime.now();
+
+        await _cacheManager.set(cacheKey, {
+          'bills': bills.map((b) => b.toJson()).toList(),
+        }, cacheConfig);
 
         return {
           'success': true,
@@ -102,7 +130,7 @@ class BillService {
           'source': 'api',
         };
       } else {
-        print('API returned error: ${response.message}');
+        _logger.warning('API returned error: ${response.message}');
         return {
           'success': false,
           'message': response.message,
@@ -110,7 +138,7 @@ class BillService {
         };
       }
     } catch (e) {
-      print('Exception in getBillHistory: $e');
+      _logger.error('Exception in getBillHistory', e);
       return {
         'success': false,
         'message': 'Failed to get bill history: $e',
@@ -120,28 +148,19 @@ class BillService {
   }
 
   /// Clear cached bills
-  void clearCache({String? userId, int? addressId}) {
+  Future<void> clearCache({String? userId, int? addressId}) async {
     if (userId != null && addressId != null) {
       final cacheKey = 'bills_${userId}_$addressId';
-      _cachedBills.remove(cacheKey);
-      _lastFetch.remove(cacheKey);
-      print('Cleared bill cache for: $cacheKey');
+      await _cacheManager.invalidate(cacheKey);
+      _logger.debug('Cleared bill cache for: $cacheKey');
     } else if (userId != null) {
-      // Clear all cache entries for this user
-      final keysToRemove = _cachedBills.keys
-          .where((key) => key.startsWith('bills_$userId'))
-          .toList();
-
-      for (final key in keysToRemove) {
-        _cachedBills.remove(key);
-        _lastFetch.remove(key);
-      }
-      print('Cleared all bill cache for user: $userId');
+      // Clear all cache entries for this user using pattern matching
+      await _cacheManager.invalidatePattern(r'^bills_' + userId + r'_\d+\$');
+      _logger.debug('Cleared all bill cache for user: $userId');
     } else {
-      // Clear all cache
-      _cachedBills.clear();
-      _lastFetch.clear();
-      print('Cleared all bill cache');
+      // Clear all bill cache
+      await _cacheManager.invalidatePattern(r'^bills_.*');
+      _logger.debug('Cleared all bill cache');
     }
   }
 
@@ -162,27 +181,181 @@ class BillService {
     required String invoiceId,
     required String userId,
     String? authToken,
+    int retryCount = 0,
   }) async {
+    const maxRetries = 2;
+
     try {
-      print(
-        'BillService: Fetching bill detail for invoice $invoiceId, user $userId',
+      _logger.debug(
+        'Fetching bill detail for invoice $invoiceId, user $userId (attempt ${retryCount + 1})',
       );
 
-      final response = await _apiService.get(
-        '/billhistorydetail',
+      final response = await _apiService.get<Map<String, dynamic>>(
+        '/get/billhistorydetail',
+        headers: _getHeaders(authToken),
         queryParams: {'invoice_id': invoiceId, 'user_id': userId},
+        fromJson: (json) {
+          _logger.debug('Raw response from API: $json');
+          if (json is Map<String, dynamic>) {
+            return json;
+          } else {
+            _logger.warning('Unexpected response type: ${json.runtimeType}');
+            return <String, dynamic>{};
+          }
+        },
       );
 
-      print('BillService: Bill detail response: ${response.data}');
+      _logger.debug(
+        'Response success: ${response.success}, data is null: ${response.data == null}',
+      );
+      _logger.debug('Response message: ${response.message}');
 
-      if (response.success && response.data != null) {
-        return response.data as Map<String, dynamic>;
-      } else {
-        throw Exception('Failed to fetch bill detail: ${response.message}');
+      if (response.data == null) {
+        throw Exception('No data received from server');
       }
+
+      final responseData = response.data!;
+      _logger.debug('Response data keys: ${responseData.keys}');
+
+      final isSuccess =
+          response.success ||
+          responseData['success'] == true ||
+          responseData['code'] == 200;
+
+      if (!isSuccess) {
+        throw Exception('API returned error: ${response.message}');
+      }
+
+      // Transform the response
+      final transformedData = _transformBillDetailResponse(responseData);
+
+      return transformedData;
     } catch (e) {
-      print('BillService: Error fetching bill detail: $e');
+      // Retry on connection errors
+      if (retryCount < maxRetries &&
+          (e.toString().contains('Connection closed') ||
+              e.toString().contains('SocketException') ||
+              e.toString().contains('TimeoutException'))) {
+        _logger.info('Retrying bill detail request in 2 seconds');
+        await Future.delayed(const Duration(seconds: 2));
+
+        return await getBillHistoryDetail(
+          invoiceId: invoiceId,
+          userId: userId,
+          authToken: authToken,
+          retryCount: retryCount + 1,
+        );
+      }
+
       rethrow;
     }
+  }
+
+  /// Transform the API response structure to make it more usable
+  Map<String, dynamic> _transformBillDetailResponse(
+    Map<String, dynamic> responseData,
+  ) {
+    try {
+      _logger.debug('Transform - Input data: $responseData');
+      _logger.debug('Transform - Input keys: ${responseData.keys}');
+
+      // Extract the main data structure
+      final data = responseData['data'] as Map<String, dynamic>?;
+      _logger.debug('Transform - data keys: ${data?.keys}');
+
+      if (data == null) {
+        _logger.warning('Transform - No data found');
+        return responseData;
+      }
+
+      // Check if invoices are in data.data.invoices or data.invoices
+      dynamic invoices;
+      if (data.containsKey('data') && data['data'] is Map<String, dynamic>) {
+        // Structure: {data: {data: {invoices: [...]}}}
+        final innerData = data['data'] as Map<String, dynamic>;
+        _logger.debug('Transform - innerData keys: ${innerData.keys}');
+        invoices = innerData['invoices'] as List<dynamic>?;
+      } else if (data.containsKey('invoices')) {
+        // Structure: {data: {invoices: [...]}}
+        invoices = data['invoices'] as List<dynamic>?;
+      }
+
+      _logger.debug('Transform - invoices count: ${invoices?.length}');
+
+      if (invoices == null || invoices.isEmpty) {
+        _logger.warning('Transform - No invoices found');
+        return responseData;
+      }
+
+      final invoice = invoices.first as Map<String, dynamic>;
+      _logger.debug('Transform - invoice keys: ${invoice.keys}');
+
+      final items = invoice['items'] as List<dynamic>? ?? [];
+      _logger.debug('Transform - items count: ${items.length}');
+
+      // Extract service details from items
+      final List<Map<String, dynamic>> serviceDetails = [];
+      final List<Map<String, dynamic>> invoiceItems = [];
+
+      for (int i = 0; i < items.length; i++) {
+        final itemMap = items[i] as Map<String, dynamic>;
+        invoiceItems.add(itemMap);
+
+        // If item has service details, add to serviceDetails
+        if (itemMap['service'] != null) {
+          final service = itemMap['service'] as Map<String, dynamic>;
+          _logger.debug('Transform - Found service in item $i');
+          _logger.debug('Transform - Service keys: ${service.keys}');
+          serviceDetails.add(service);
+        } else {
+          _logger.debug(
+            'Transform - No service in item $i (${itemMap['type']})',
+          );
+        }
+      }
+
+      _logger.debug(
+        'Transform - Total serviceDetails found: ${serviceDetails.length}',
+      );
+
+      final result = {
+        'invoice': invoice,
+        'invoiceitems': invoiceItems,
+        'servicedetails': serviceDetails,
+        'midtrans': {
+          'code': data['code'],
+          'midtransclient': data['midtransclient'],
+          'merchantbaseurl': data['merchantbaseurl'],
+          'midtransorderid': data['midtransorderid'],
+          'midtransLink': data['midtransLink'],
+          'midtranstoken': data['midtranstoken'],
+        },
+        'raw_response': responseData,
+      };
+
+      _logger.debug('Transform - Final result keys: ${result.keys}');
+      _logger.debug('Transform - Invoice items count: ${invoiceItems.length}');
+      _logger.debug(
+        'Transform - Service details count: ${serviceDetails.length}',
+      );
+
+      return result;
+    } catch (e, stackTrace) {
+      _logger.error('Error transforming bill detail response', e, stackTrace);
+      return responseData;
+    }
+  }
+
+  /// Get detailed bill information using BillHistory object
+  Future<Map<String, dynamic>> getBillHistoryDetailFromBill({
+    required BillHistory billHistory,
+    required String userId,
+    String? authToken,
+  }) async {
+    return await getBillHistoryDetail(
+      invoiceId: billHistory.invoiceId,
+      userId: userId,
+      authToken: authToken,
+    );
   }
 }

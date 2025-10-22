@@ -66,7 +66,7 @@ class AddOnCardWidget extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFFFFA500),
+                    color: Color(0xFFF9D43A),
                     fontFamily: 'Open Sans',
                   ),
                 ),
@@ -75,29 +75,25 @@ class AddOnCardWidget extends StatelessWidget {
           ),
 
           // Buy Button
-          SizedBox(
-            height: 32,
-            child: ElevatedButton(
-              onPressed: onBuyPressed,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4CB04C),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 6,
-                ),
+          ElevatedButton(
+            onPressed: onBuyPressed,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4CB04C),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-              child: const Text(
-                'Buy',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Open Sans',
-                ),
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+              minimumSize: const Size(60, 32),
+              maximumSize: const Size(80, 32),
+            ),
+            child: const Text(
+              'Buy',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Open Sans',
               ),
             ),
           ),

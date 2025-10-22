@@ -43,12 +43,22 @@ dependencies:
   http_parser: ^4.0.2
   firebase_messaging: ^14.7.6
   firebase_core: ^2.24.2
+  firebase_analytics: ^10.8.0
+  firebase_crashlytics: ^3.4.9
   lottie: ^3.1.2
+  flutter_dotenv: ^5.1.0
+  flutter_secure_storage: ^9.0.0
+  crypto: ^3.0.3
+  logger: ^2.0.2+1
+  sentry_flutter: ^7.14.0
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   liquid_swipe: ^3.0.0
+  flutter_inappwebview: ^6.0.0
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -64,6 +74,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - .env
     - assets/images/app_logo.png
     - assets/images/bottom_gradient.png
     - assets/images/top_gradient.png

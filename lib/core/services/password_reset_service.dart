@@ -1,18 +1,154 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
+import '../config/app_config.dart';
+import 'app_logger.dart';
 
 class PasswordResetService {
-  static const String baseUrl = 'https://7c3591ea9167.ngrok-free.app/api/v1';
-  static const String apiServer = 'LIVINET_API_SERVER';
-  static const String apiKey = 'LIVINET_API_KEY_12345';
+  static final _config = AppConfig.instance;
+  static String get baseUrl => _config.baseUrl;
+  static String get apiServer => _config.apiServer;
+  static String get apiKey => _config.apiKey;
   static PasswordResetService? _instance;
+  final _logger = AppLogger.instance;
 
   PasswordResetService._internal();
 
   static PasswordResetService get instance {
     _instance ??= PasswordResetService._internal();
     return _instance!;
+  }
+
+  Future<Map<String, dynamic>> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    String? email,
+  }) async {
+    try {
+      _logger.info('Starting change password request');
+
+      // Get auth token
+      final authService = AuthService();
+      final token = await authService.getAuthToken();
+      if (token == null) {
+        _logger.warning('No auth token found');
+        return {
+          'success': false,
+          'message': 'Authentication token not found',
+          'data': null,
+        };
+      }
+
+      // Get user info
+      final userInfo = await authService.getCurrentUser();
+      if (email == null || email.isEmpty) {
+        email = userInfo?['user_email'];
+      }
+
+      final phone = userInfo?['phone'];
+
+      if ((email == null || email.isEmpty) &&
+          (phone == null || phone.isEmpty)) {
+        _logger.warning('No email or phone found');
+        return {
+          'success': false,
+          'message': 'User email or phone not found',
+          'data': null,
+        };
+      }
+
+      _logger.debug('Email: $email, Phone: $phone');
+
+      // Prepare request body - Backend will generate random password
+      final Map<String, dynamic> requestBody = {
+        'name_server': apiServer,
+        'key_server': apiKey,
+        'type': 'reset', // Backend uses 'reset' type to generate new password
+      };
+
+      // Add email or phone (backend checks both)
+      if (email != null && email.isNotEmpty) {
+        requestBody['email'] = email;
+      }
+      if (phone != null && phone.isNotEmpty) {
+        requestBody['phone'] = phone;
+      }
+
+      _logger.debug('Request URL: $baseUrl/post/changePassword');
+      _logger.debug('Request body: ${jsonEncode(requestBody)}');
+
+      // Make API request
+      final response = await http.post(
+        Uri.parse('$baseUrl/post/changePassword'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+          'name_server': apiServer,
+          'key_server': apiKey,
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      _logger.info('Response Status: ${response.statusCode}');
+      _logger.debug('Response Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+        if (responseData['success'] == true) {
+          // Extract new password from response
+          final newPassword = responseData['data']?['reset_password'];
+
+          return {
+            'success': true,
+            'message':
+                responseData['message'] ??
+                'Password has been reset. New password sent to your email.',
+            'data': responseData['data'],
+            'new_password': newPassword, // For display if needed
+          };
+        } else {
+          return {
+            'success': false,
+            'message': responseData['message'] ?? 'Password reset failed',
+            'data': null,
+          };
+        }
+      } else if (response.statusCode == 422) {
+        final Map<String, dynamic> errorData = jsonDecode(response.body);
+        return {
+          'success': false,
+          'message': errorData['message'] ?? 'Validation error',
+          'data': null,
+          'errors': errorData['data'],
+        };
+      } else if (response.statusCode == 500) {
+        final Map<String, dynamic> errorData = jsonDecode(response.body);
+        final whmcsError = errorData['data']?['whmcs'];
+        return {
+          'success': false,
+          'message':
+              whmcsError ?? errorData['message'] ?? 'System error occurred',
+          'data': null,
+        };
+      } else {
+        return {
+          'success': false,
+          'message':
+              'Failed to reset password. Server returned ${response.statusCode}',
+          'data': null,
+        };
+      }
+    } catch (e, stackTrace) {
+      _logger.error('Error in changePassword', e, stackTrace);
+      return {
+        'success': false,
+        'message': 'Network error occurred: $e',
+        'data': null,
+      };
+    }
   }
 
   /// Reset password using phone or email
@@ -46,7 +182,8 @@ class PasswordResetService {
       final Map<String, dynamic> requestBody = {
         'name_server': apiServer,
         'key_server': apiKey,
-        'type': 'mobile_app',
+        'type': 'reset',
+        'email': email,
       };
 
       // Add phone or email to request
@@ -59,7 +196,7 @@ class PasswordResetService {
 
       // Make API request
       final response = await http.post(
-        Uri.parse('$baseUrl/update/changePassword'),
+        Uri.parse('$baseUrl/post/changePassword'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -69,8 +206,8 @@ class PasswordResetService {
         body: jsonEncode(requestBody),
       );
 
-      print('Password Reset Response Status: ${response.statusCode}');
-      print('Password Reset Response Body: ${response.body}');
+      _logger.info('Password Reset Response Status: ${response.statusCode}');
+      _logger.debug('Password Reset Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
@@ -114,7 +251,7 @@ class PasswordResetService {
         };
       }
     } catch (e) {
-      print('Password Reset Error: $e');
+      _logger.error('Error in resetPassword', e);
       return {
         'success': false,
         'message': 'Network error occurred: $e',

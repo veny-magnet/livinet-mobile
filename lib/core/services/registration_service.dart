@@ -1,12 +1,13 @@
 // lib/services/registration_service.dart
 import 'dart:convert';
-import 'dart:io';
 import 'package:http/http.dart' as http;
+import '../config/app_config.dart';
 
 class RegistrationService {
-  static const String baseUrl = 'https://7c3591ea9167.ngrok-free.app/api/v1';
-  static const String apiServer = 'LIVINET_API_SERVER';
-  static const String apiKey = 'LIVINET_API_KEY';
+  static final _config = AppConfig.instance;
+  static String get baseUrl => _config.baseUrl;
+  static String get apiServer => _config.apiServer;
+  static String get apiKey => _config.apiKey;
 
   // Complete registration
   Future<Map<String, dynamic>> register(
@@ -51,7 +52,7 @@ class RegistrationService {
 
   static int _userCounter = 0;
   String generateUserId() {
-    final id = 'CR0060${_userCounter.toString().padLeft(2, '0')}';
+    final id = 'CR006${_userCounter.toString().padLeft(2, '0')}';
     _userCounter++;
     return id;
   }
@@ -88,7 +89,7 @@ class RegistrationService {
       'referral_code': referralCode?.trim(),
       'ktp_path': ktpPath,
       'identity_card': identityCard,
-      'fcm_token': fcmToken ?? 'TESTTTT-TOKEN',
+      'fcm_token': fcmToken,
     };
   }
 

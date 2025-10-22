@@ -1,55 +1,200 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../../core/models/order_models.dart';
-import '../../core/widgets/midtrans_payment_dialog.dart';
+import '../../core/models/order_detail_models.dart' as order_detail;
 import '../home/home_screen.dart';
 
-class PaymentScreen extends StatefulWidget {
-  final OrderResponse orderResponse;
+// Wrapper class to handle both OrderResponse and OrderDetail
+class PaymentData {
+  final String subtotal;
+  final String tax;
+  final String taxRate;
+  final String credit;
+  final String total;
+  final String productName;
+  final String productDetail;
+  final String billingCycle;
+  final String midtransOrderId;
+  final String midtransToken;
+  final String midtransClientKey;
+  final String midtransRedirectUrl;
+  final String? setupFee;
+  final String? serviceCost;
+  final String? setupFeeDescription;
+  final String? recurringServiceDescription;
 
-  const PaymentScreen({super.key, required this.orderResponse});
+  PaymentData({
+    required this.subtotal,
+    required this.tax,
+    required this.taxRate,
+    required this.credit,
+    required this.total,
+    required this.productName,
+    required this.productDetail,
+    required this.billingCycle,
+    required this.midtransOrderId,
+    required this.midtransToken,
+    required this.midtransClientKey,
+    required this.midtransRedirectUrl,
+    this.setupFee,
+    this.serviceCost,
+    this.setupFeeDescription,
+    this.recurringServiceDescription,
+  });
+
+  // Create from OrderResponse
+  factory PaymentData.fromOrderResponse(OrderResponse order) {
+    return PaymentData(
+      subtotal: order.subtotal,
+      tax: order.tax,
+      taxRate: order.taxRate,
+      credit: order.credit,
+      total: order.total,
+      productName: order.productName,
+      productDetail: order.productDetail,
+      billingCycle: order.billingCycle,
+      midtransOrderId: order.midtransOrderId,
+      midtransToken: order.midtransLink.token,
+      midtransClientKey: order.midtransClient,
+      midtransRedirectUrl: order.midtransLink.redirectUrl,
+    );
+  }
+
+  // Create from OrderDetail
+  factory PaymentData.fromOrderDetail(order_detail.OrderDetail order) {
+    return PaymentData(
+      subtotal: order.subtotal,
+      tax: order.tax,
+      taxRate: order.taxRate,
+      credit: order.credit,
+      total: order.total,
+      productName: order.productName,
+      productDetail: order.serviceGroup,
+      billingCycle: order.billingCycle,
+      midtransOrderId: order.midtransOrderId,
+      midtransToken: order.midtransData.midtransToken,
+      midtransClientKey: order.midtransData.midtransClientKey,
+      midtransRedirectUrl: order.midtransData.midtransRedirectUrl,
+      setupFee: order.invoiceDetails.setupFee?.amount,
+      serviceCost: order.invoiceDetails.recurringService?.amount,
+      setupFeeDescription: order.invoiceDetails.setupFee?.description,
+      recurringServiceDescription:
+          order.invoiceDetails.recurringService?.description,
+    );
+  }
+}
+
+class PaymentScreen extends StatefulWidget {
+  final PaymentData orderData;
+  final OrderResponse? orderResponse;
+
+  const PaymentScreen({super.key, required this.orderData, this.orderResponse});
+
+  // Constructor for OrderResponse (backward compatibility)
+  PaymentScreen.fromOrderResponse({
+    super.key,
+    required OrderResponse orderResponse,
+  }) : orderData = PaymentData.fromOrderResponse(orderResponse),
+       orderResponse = orderResponse;
+
+  // Constructor for OrderDetail
+  PaymentScreen.fromOrderDetail({
+    super.key,
+    required order_detail.OrderDetail orderDetail,
+  }) : orderData = PaymentData.fromOrderDetail(orderDetail),
+       orderResponse = null;
 
   @override
   State<PaymentScreen> createState() => _PaymentScreenState();
 }
 
 class _PaymentScreenState extends State<PaymentScreen> {
-  // Helper getters untuk data real dari order response
-  double get _subtotal => double.tryParse(widget.orderResponse.subtotal) ?? 0;
-  double get _vat => double.tryParse(widget.orderResponse.tax) ?? 0;
-  double get _credit => double.tryParse(widget.orderResponse.credit) ?? 0;
-  double get _total => double.tryParse(widget.orderResponse.total) ?? 0;
-
-  String get _formatSubtotal => 'Rp. ${_formatNumber(_subtotal)}';
-  String get _formatVat => 'Rp. ${_formatNumber(_vat)}';
-  String get _formatCredit => 'Rp. ${_formatNumber(_credit)}';
-  String get _formatTotal => 'Rp. ${_formatNumber(_total)}';
+  // Helper getters untuk data dari PaymentData
+  double get _subtotal => double.tryParse(widget.orderData.subtotal) ?? 0;
+  double get _vat => double.tryParse(widget.orderData.tax) ?? 0;
+  double get _credit => double.tryParse(widget.orderData.credit) ?? 0;
+  double get _total => double.tryParse(widget.orderData.total) ?? 0;
 
   void _showMidtransPayment() {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => MidtransPaymentDialog(
-        redirectUrl: widget.orderResponse.midtransLink.redirectUrl,
-        orderResponse: widget.orderResponse,
-        onPaymentComplete: (success) {
-          // Close dialog first
-          Navigator.of(context).pop();
-
-          if (success) {
-            // Use a slight delay to ensure dialog is fully closed
-            // before navigating to prevent navigation conflicts
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const HomeScreen()),
-                  (route) => false,
-                );
-              }
-            });
-          }
+      builder: (context) => MidtransSnapDialog(
+        snapToken: widget.orderData.midtransToken,
+        clientKey: widget.orderData.midtransClientKey,
+        isProduction: false, // Set true untuk production
+        onPaymentFinished: (result) {
+          _handlePaymentResult(result);
         },
       ),
     );
+  }
+
+  void _handlePaymentResult(Map<String, dynamic> result) {
+    final status = result['status'] ?? 'unknown';
+    print('Payment result received: $status');
+
+    if (status == 'success') {
+      // Payment successful
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payment successful!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Navigate to home after showing message
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+            (route) => false,
+          );
+        }
+      });
+    } else if (status == 'pending') {
+      // Payment pending
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payment pending. Please complete your payment.'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 3),
+        ),
+      );
+
+      // Navigate to home after showing message
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+            (route) => false,
+          );
+        }
+      });
+    } else if (status == 'error') {
+      // Payment error
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Payment failed: ${result['message'] ?? 'Unknown error'}',
+          ),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } else if (status == 'closed') {
+      // Payment closed/cancelled - hanya tampilkan snackbar, tidak navigate
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payment cancelled'),
+          backgroundColor: Colors.grey,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      // User tetap di PaymentScreen, bisa mencoba lagi
+    }
   }
 
   @override
@@ -90,7 +235,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: Text(
-                      'No. Tagihan ${widget.orderResponse.midtransOrderId}',
+                      'No. Tagihan ${widget.orderData.midtransOrderId}',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.green.shade600,
@@ -109,7 +254,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              widget.orderResponse.productName,
+                              widget.orderData.productName,
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -119,7 +264,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              widget.orderResponse.billingCycle,
+                              widget.orderData.billingCycle,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey.shade600,
@@ -144,7 +289,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   const SizedBox(height: 32),
                   // Bill Summary Title
                   Text(
-                    '${widget.orderResponse.productDetail} Bill Payment',
+                    '${widget.orderData.productDetail} Bill Payment',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -173,20 +318,58 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     ),
                     child: Column(
                       children: [
+                        // Cost Breakdown Section (if available)
+                        if (widget.orderData.setupFee != null ||
+                            widget.orderData.serviceCost != null) ...[
+                          // Setup Fee
+                          if (widget.orderData.setupFee != null)
+                            _buildBillRow(
+                              widget.orderData.setupFeeDescription ??
+                                  'Setup Fee',
+                              'Rp. ${_formatNumber(double.tryParse(widget.orderData.setupFee!) ?? 0)}',
+                            ),
+
+                          // Service Cost
+                          if (widget.orderData.serviceCost != null) ...[
+                            if (widget.orderData.setupFee != null)
+                              const SizedBox(height: 16),
+                            _buildBillRow(
+                              widget.orderData.recurringServiceDescription ??
+                                  'Service Cost',
+                              'Rp. ${_formatNumber(double.tryParse(widget.orderData.serviceCost!) ?? 0)}',
+                            ),
+                          ],
+
+                          const SizedBox(height: 16),
+                          _buildBillRow(
+                            'Subtotal',
+                            'Rp. ${_formatNumber(_subtotal)}',
+                          ),
+                          const SizedBox(height: 16),
+                        ] else ...[
+                          _buildBillRow(
+                            'Product Subtotal',
+                            'Rp. ${_formatNumber(_subtotal)}',
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+
+                        // Tax
                         _buildBillRow(
-                          'Product Subtotal',
-                          'Rp. ${_formatNumber(_subtotal)}',
-                        ),
-                        const SizedBox(height: 16),
-                        _buildBillRow(
-                          '${widget.orderResponse.taxRate}% VAT',
+                          '${widget.orderData.taxRate}% VAT',
                           'Rp. ${_formatNumber(_vat)}',
                         ),
-                        const SizedBox(height: 16),
-                        _buildBillRow(
-                          'Credit',
-                          'Rp. ${_formatNumber(_credit)}',
-                        ),
+
+                        // Credit (if any)
+                        if (_credit > 0) ...[
+                          const SizedBox(height: 16),
+                          _buildBillRow(
+                            'Credit',
+                            '- Rp. ${_formatNumber(_credit)}',
+                            isDiscount: true,
+                          ),
+                        ],
+
                         const SizedBox(height: 20),
                         Divider(color: Colors.grey.shade300),
                         const SizedBox(height: 16),
@@ -280,15 +463,20 @@ class _PaymentScreenState extends State<PaymentScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: isTotal ? 14 : 13,
-            fontWeight: isTotal ? FontWeight.w600 : FontWeight.w400,
-            color: Colors.black,
-            fontFamily: 'Open Sans',
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: isTotal ? 14 : 13,
+              fontWeight: isTotal ? FontWeight.w600 : FontWeight.w400,
+              color: Colors.black,
+              fontFamily: 'Open Sans',
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
+        const SizedBox(width: 8),
         Text(
           amount,
           style: TextStyle(
@@ -309,5 +497,343 @@ class _PaymentScreenState extends State<PaymentScreen> {
           RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
           (Match m) => '${m[1]},',
         );
+  }
+}
+
+// ============================================================================
+// MIDTRANS SNAP DIALOG WIDGET
+// ============================================================================
+
+class MidtransSnapDialog extends StatefulWidget {
+  final String snapToken;
+  final String clientKey;
+  final Function(Map<String, dynamic>) onPaymentFinished;
+  final bool isProduction;
+
+  const MidtransSnapDialog({
+    super.key,
+    required this.snapToken,
+    required this.clientKey,
+    required this.onPaymentFinished,
+    this.isProduction = false,
+  });
+
+  @override
+  State<MidtransSnapDialog> createState() => _MidtransSnapDialogState();
+}
+
+class _MidtransSnapDialogState extends State<MidtransSnapDialog> {
+  bool _isLoading = true;
+  bool _isPaymentProcessed = false; // Flag untuk mencegah multiple callbacks
+
+  String get _snapUrl {
+    return widget.isProduction
+        ? 'https://app.midtrans.com/snap/snap.js'
+        : 'https://app.sandbox.midtrans.com/snap/snap.js';
+  }
+
+  void _handlePaymentFinished(Map<String, dynamic> result) {
+    // Cegah multiple callbacks
+    if (_isPaymentProcessed) {
+      print('Payment already processed, ignoring duplicate callback');
+      return;
+    }
+
+    _isPaymentProcessed = true;
+    print('Processing payment result: ${result['status']}');
+
+    // Close dialog
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+
+    // Call callback
+    widget.onPaymentFinished(result);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return WillPopScope(
+      onWillPop: () async {
+        // Ketika user menekan back button
+        if (!_isPaymentProcessed) {
+          _handlePaymentFinished({'status': 'closed'});
+        }
+        return false; // Prevent default back action
+      },
+      child: Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // WebView Content
+              Flexible(
+                child: Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(16),
+                        bottomRight: Radius.circular(16),
+                      ),
+                      child: InAppWebView(
+                        initialData: InAppWebViewInitialData(
+                          data: _generateHtmlContent(),
+                          baseUrl: WebUri(_snapUrl.split('/snap.js')[0]),
+                        ),
+                        initialSettings: InAppWebViewSettings(
+                          javaScriptEnabled: true,
+                          domStorageEnabled: true,
+                          allowFileAccess: true,
+                          allowContentAccess: true,
+                          useHybridComposition: true,
+                          transparentBackground: true,
+                          supportZoom: false,
+                          builtInZoomControls: false,
+                          disableHorizontalScroll: false,
+                          disableVerticalScroll: false,
+                        ),
+                        onWebViewCreated: (controller) {
+                          // Add JavaScript handler to receive payment result
+                          controller.addJavaScriptHandler(
+                            handlerName: 'PaymentFinish',
+                            callback: (args) {
+                              if (args.isNotEmpty && !_isPaymentProcessed) {
+                                final result = args[0] as Map<String, dynamic>;
+                                _handlePaymentFinished(result);
+                              }
+                            },
+                          );
+                        },
+                        onLoadStart: (controller, url) {
+                          print('Loading started: $url');
+                        },
+                        onLoadStop: (controller, url) {
+                          print('Loading finished: $url');
+                          if (mounted) {
+                            setState(() {
+                              _isLoading = false;
+                            });
+                          }
+                        },
+                        onConsoleMessage: (controller, consoleMessage) {
+                          print('Console: ${consoleMessage.message}');
+                        },
+                        onLoadError: (controller, url, code, message) {
+                          print('Load error: $code - $message');
+                          if (mounted) {
+                            setState(() {
+                              _isLoading = false;
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                    if (_isLoading)
+                      Container(
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.only(
+                            bottomLeft: Radius.circular(16),
+                            bottomRight: Radius.circular(16),
+                          ),
+                        ),
+                        child: const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Color(0xFF4CB04C),
+                                ),
+                              ),
+                              SizedBox(height: 16),
+                              Text(
+                                'Loading payment...',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey,
+                                  fontFamily: 'Open Sans',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _generateHtmlContent() {
+    return '''
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <script type="text/javascript" src="$_snapUrl" data-client-key="${widget.clientKey}"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    
+    body {
+      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background-color: #ffffff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 0;
+    }
+    
+    #snap-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+    
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #4CB04C;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .loading-text {
+      color: #666;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div id="snap-container">
+    <div class="loading">
+      <div class="spinner"></div>
+      <div class="loading-text">Initializing payment...</div>
+    </div>
+  </div>
+  
+  <script type="text/javascript">
+    console.log('Starting Midtrans Snap initialization...');
+    
+    var paymentProcessed = false; // Flag to prevent multiple callbacks
+    
+    function sendPaymentResult(result) {
+      if (paymentProcessed) {
+        console.log('Payment already processed, skipping...');
+        return;
+      }
+      paymentProcessed = true;
+      
+      if (window.flutter_inappwebview) {
+        window.flutter_inappwebview.callHandler('PaymentFinish', result);
+      }
+    }
+    
+    function initializePayment() {
+      console.log('initializePayment called');
+      
+      if (typeof window.snap === 'undefined') {
+        console.error('Snap.js not loaded, retrying...');
+        setTimeout(initializePayment, 500);
+        return;
+      }
+      
+      console.log('Snap.js ready, calling snap.pay...');
+      
+      try {
+        window.snap.pay('${widget.snapToken}', {
+          onSuccess: function(result) {
+            console.log('Payment SUCCESS:', JSON.stringify(result));
+            sendPaymentResult({
+              status: 'success',
+              result: result
+            });
+          },
+          onPending: function(result) {
+            console.log('Payment PENDING:', JSON.stringify(result));
+            sendPaymentResult({
+              status: 'pending',
+              result: result
+            });
+          },
+          onError: function(result) {
+            console.log('Payment ERROR:', JSON.stringify(result));
+            sendPaymentResult({
+              status: 'error',
+              result: result,
+              message: result.status_message || 'Payment failed'
+            });
+          },
+          onClose: function() {
+            console.log('Payment popup CLOSED by user');
+            sendPaymentResult({
+              status: 'closed'
+            });
+          }
+        });
+        
+        console.log('snap.pay called successfully');
+      } catch (error) {
+        console.error('Error calling snap.pay:', error);
+        sendPaymentResult({
+          status: 'error',
+          message: error.toString()
+        });
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM Content Loaded');
+        setTimeout(initializePayment, 1000);
+      });
+    } else {
+      console.log('DOM already loaded');
+      setTimeout(initializePayment, 1000);
+    }
+  </script>
+</body>
+</html>
+''';
   }
 }

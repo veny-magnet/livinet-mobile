@@ -2,9 +2,11 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import '../config/app_config.dart';
 
 class KtpService {
-  static const String baseUrl = 'https://7c3591ea9167.ngrok-free.app/api/v1';
+  static final _config = AppConfig.instance;
+  static String get baseUrl => _config.baseUrl;
 
   Future<Map<String, dynamic>> uploadAndProcessKtp({
     required String userId,

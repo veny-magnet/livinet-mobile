@@ -83,8 +83,7 @@ class UserProfile {
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     // Print received JSON for debugging
-    print('UserProfile.fromJson received: ${json.keys}');
-    
+
     return UserProfile(
       id: _safeGet(json, 'id', 0),
       userId: _safeGet(json, 'user_id', ''),
@@ -134,7 +133,7 @@ class UserProfile {
         final value = json[key];
         if (value == null) return defaultValue;
         if (value is T) return value;
-        
+
         // Type conversion for common cases
         if (T == String && value is! String) {
           return value.toString() as T;
@@ -145,12 +144,11 @@ class UserProfile {
         if (T == int && value is double) {
           return value.toInt() as T;
         }
-        
+
         return value as T;
       }
       return defaultValue;
     } catch (e) {
-      print('UserProfile._safeGet error for key "$key": $e');
       return defaultValue;
     }
   }

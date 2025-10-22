@@ -1,4 +1,7 @@
 import 'base_api_service.dart';
+import 'app_logger.dart';
+import '../cache/cache_manager.dart';
+import '../cache/cache.dart';
 
 class Product {
   final int pid;
@@ -51,11 +54,11 @@ class Product {
 
 class ProductService {
   final BaseApiService _apiService = BaseApiService();
+  final _logger = AppLogger.instance;
+  final _cacheManager = CacheManager.instance;
 
   static ProductService? _instance;
-  Map<String, List<Product>> _cachedProducts = {};
-  Map<String, DateTime> _lastFetch = {};
-  static const Duration _cacheExpiry = Duration(minutes: 15);
+  static const String CACHE_VERSION = '1.0.0';
 
   ProductService._internal();
 
@@ -64,30 +67,44 @@ class ProductService {
     return _instance!;
   }
 
-  /// Get products with authentication
+  /// Get products with caching support
   Future<Map<String, dynamic>> getProducts({
     required String userId,
     int? addressId,
+    bool forceRefresh = false,
   }) async {
     try {
       final cacheKey = 'products_${userId}_${addressId ?? 'no_address'}';
-      print('ProductService - Requesting products with key: $cacheKey');
+      final cacheConfig = CacheConfig(
+        maxAge: const Duration(minutes: 15),
+        staleAge: const Duration(hours: 2),
+        strategy: CacheStrategy.staleWhileRevalidate,
+        version: CACHE_VERSION,
+      );
 
-      // Check if we have cached data for this specific key
-      if (_cachedProducts.containsKey(cacheKey) &&
-          _lastFetch.containsKey(cacheKey) &&
-          DateTime.now().difference(_lastFetch[cacheKey]!) < _cacheExpiry) {
-        print('ProductService - Returning cached products for key: $cacheKey');
-        return {
-          'success': true,
-          'data': _cachedProducts[cacheKey],
-          'message': 'Products fetched from cache',
-        };
+      // Try cache first (unless force refresh)
+      if (!forceRefresh) {
+        final cached = await _cacheManager.get<List<Product>>(
+          cacheKey,
+          cacheConfig,
+          (json) {
+            final productsData = json['products'] as List;
+            return productsData.map((p) => Product.fromJson(p)).toList();
+          },
+        );
+
+        if (cached != null && !cached.isExpired(cacheConfig.maxAge)) {
+          _logger.debug('Cache HIT: $cacheKey');
+          return {
+            'success': true,
+            'data': cached.data,
+            'message': 'Products from cache',
+            'fromCache': true,
+          };
+        }
       }
 
-      print(
-        'ProductService - Cache miss, fetching from API for key: $cacheKey',
-      );
+      _logger.debug('Cache MISS, fetching from API: $cacheKey');
 
       // Prepare query parameters
       final Map<String, String> queryParams = {'user_id': userId};
@@ -114,10 +131,17 @@ class ProductService {
             .map((json) => Product.fromJson(json))
             .toList();
 
-        _cachedProducts[cacheKey] = products;
-        _lastFetch[cacheKey] = DateTime.now();
+        // Update cache
+        await _cacheManager.set(cacheKey, {
+          'products': products.map((p) => p.toJson()).toList(),
+        }, cacheConfig);
 
-        return {'success': true, 'data': products, 'message': response.message};
+        return {
+          'success': true,
+          'data': products,
+          'message': response.message,
+          'fromCache': false,
+        };
       } else {
         return {'success': false, 'message': response.message, 'data': []};
       }
@@ -177,9 +201,7 @@ class ProductService {
         queryParams['address_id'] = addressId.toString();
       }
 
-      print(
-        'ProductService - getAddOnsForSubscription with params: $queryParams',
-      );
+      _logger.debug('getAddOnsForSubscription with params: $queryParams');
 
       // Add additional headers for ngrok
       final additionalHeaders = {'ngrok-skip-browser-warning': 'true'};
@@ -218,7 +240,7 @@ class ProductService {
 
       return {'success': false, 'message': errorMessage, 'data': []};
     } catch (e) {
-      print('ProductService Error - getAddOnsForSubscription: $e');
+      _logger.error('Error in getAddOnsForSubscription', e);
       return {
         'success': false,
         'message': 'Unexpected error occurred. Please try again.',
@@ -228,40 +250,20 @@ class ProductService {
   }
 
   /// Clear cached products
-  void clearCache({String? userId, int? addressId}) {
+  Future<void> clearCache({String? userId, int? addressId}) async {
     if (userId != null) {
-      // Clear cache for specific user and address combination
       if (addressId != null) {
+        // Clear specific cache
         final cacheKey = 'products_${userId}_$addressId';
-        _cachedProducts.remove(cacheKey);
-        _lastFetch.remove(cacheKey);
+        await _cacheManager.invalidate(cacheKey);
       } else {
         // Clear all cache for this user
-        final keysToRemove = _cachedProducts.keys
-            .where((key) => key.startsWith('products_$userId'))
-            .toList();
-        for (final key in keysToRemove) {
-          _cachedProducts.remove(key);
-          _lastFetch.remove(key);
-        }
+        await _cacheManager.invalidatePattern(r'products_' + userId + r'_.*');
       }
     } else {
-      // Clear all cache
-      _cachedProducts.clear();
-      _lastFetch.clear();
+      // Clear all product cache
+      await _cacheManager.invalidatePattern(r'products_.*');
     }
-  }
-
-  /// Get cached products without making API call
-  List<Product>? getCachedProducts({required String userId, int? addressId}) {
-    final cacheKey = 'products_${userId}_${addressId ?? 'no_address'}';
-
-    if (_cachedProducts.containsKey(cacheKey) &&
-        _lastFetch.containsKey(cacheKey) &&
-        DateTime.now().difference(_lastFetch[cacheKey]!) < _cacheExpiry) {
-      return _cachedProducts[cacheKey];
-    }
-    return null;
   }
 
   /// Force refresh products (bypass cache)
@@ -269,10 +271,12 @@ class ProductService {
     required String userId,
     int? addressId,
   }) async {
-    final cacheKey = 'products_${userId}_${addressId ?? 'no_address'}';
-    _cachedProducts.remove(cacheKey);
-    _lastFetch.remove(cacheKey);
-    return await getProducts(userId: userId, addressId: addressId);
+    await clearCache(userId: userId, addressId: addressId);
+    return await getProducts(
+      userId: userId,
+      addressId: addressId,
+      forceRefresh: true,
+    );
   }
 
   /// Get product ID for bill payment based on bill context
@@ -301,8 +305,8 @@ class ProductService {
               final normalizedProductName = product.name.toLowerCase();
               if (normalizedProductName.contains(normalizedPlanName) ||
                   normalizedPlanName.contains(normalizedProductName)) {
-                print(
-                  'ProductService: Found matching product by name: ${product.name} (ID: ${product.pid})',
+                _logger.debug(
+                  'Found matching product by name: ${product.name} (ID: ${product.pid})',
                 );
                 return product.pid;
               }
@@ -310,8 +314,8 @@ class ProductService {
           }
 
           // Strategy 2: Use first available product
-          print(
-            'ProductService: Using first available product: ${products.first.name} (ID: ${products.first.pid})',
+          _logger.debug(
+            'Using first available product: ${products.first.name} (ID: ${products.first.pid})',
           );
           return products.first.pid;
         }
@@ -321,17 +325,15 @@ class ProductService {
       if (invoiceId != null && invoiceId.isNotEmpty) {
         final parsed = int.tryParse(invoiceId);
         if (parsed != null && parsed > 0) {
-          print(
-            'ProductService: Using invoice ID as product reference: $parsed',
-          );
+          _logger.debug('Using invoice ID as product reference: $parsed');
           return parsed;
         }
       }
 
-      print('ProductService: No suitable product ID found');
+      _logger.warning('No suitable product ID found');
       return null;
     } catch (e) {
-      print('ProductService Error - getProductIdForBill: $e');
+      _logger.error('Error in getProductIdForBill', e);
       return null;
     }
   }

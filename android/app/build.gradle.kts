@@ -12,12 +12,12 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     defaultConfig {
@@ -38,6 +38,20 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+}
+
+dependencies {
+    // Import the Firebase BoM
+    implementation(platform("com.google.firebase:firebase-bom:34.4.0"))
+    
+    // Firebase Analytics
+    implementation("com.google.firebase:firebase-analytics")
+    
+    // Firebase Cloud Messaging
+    implementation("com.google.firebase:firebase-messaging")
+    
+    // Firebase Crashlytics (already in use)
+    implementation("com.google.firebase:firebase-crashlytics")
 }
 
 flutter {

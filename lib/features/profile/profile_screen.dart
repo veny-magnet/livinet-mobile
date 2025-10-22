@@ -29,30 +29,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadUserProfile() async {
     try {
-      // First try to get cached profile to get user ID
-      final cachedProfile = UserProfileService.instance.getCachedProfile();
+      // Get user ID from auth service
+      final authService = AuthService();
+      final currentUser = await authService.getCurrentUser();
 
       String? userIdToUse;
 
-      if (cachedProfile != null) {
-        userIdToUse = cachedProfile.userId;
+      if (currentUser != null && currentUser['user_id'] != null) {
+        userIdToUse = currentUser['user_id'];
       } else {
-        // Get user ID from auth service
-        final authService = AuthService();
-        final currentUser = await authService.getCurrentUser();
-
-        if (currentUser != null && currentUser['user_id'] != null) {
-          userIdToUse = currentUser['user_id'];
-        } else {
-          // If no user found in auth, user needs to login
-          setState(() {
-            status = 'not_logged_in';
-            isLoading = false;
-          });
-          return;
-        }
+        // If no user found in auth, user needs to login
+        setState(() {
+          status = 'not_logged_in';
+          isLoading = false;
+        });
+        return;
       }
 
+      // getUserProfile will use cache automatically via CacheManager
       final result = await UserProfileService.instance.getUserProfile(
         userIdToUse!,
       );

@@ -111,7 +111,6 @@ class _SignupScreenState extends State<SignupScreen> {
       try {
         fcmToken = await FcmService.getTokenForRegistration();
       } catch (e) {
-        print('Failed to get FCM token: $e');
         // Continue without FCM token - it's optional
       }
 
@@ -283,11 +282,7 @@ class _SignupScreenState extends State<SignupScreen> {
             try {
               final areas = await _locationService.getAreas(city.id);
               _areasCache[city.id] = areas;
-              print(
-                '🔍 Preloaded ${areas.length} areas for city: ${city.name} (ID: ${city.id})',
-              );
             } catch (e) {
-              print('❌ Failed to preload areas for city ${city.id}: $e');
               debugPrint('Failed to preload areas for city ${city.id}: $e');
             }
           }
@@ -314,7 +309,6 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() {
       _currentAreas = _areasCache[city.id] ?? [];
       _selectedArea = null;
-      print('🔍 _currentAreas updated: ${_currentAreas.length} items');
     });
 
     // If no cached areas, fetch from API directly
@@ -326,15 +320,9 @@ class _SignupScreenState extends State<SignupScreen> {
           _currentAreas = areas;
         });
 
-        for (var area in areas) {
-          print('   - ${area.areaName}');
-        }
+        for (var area in areas) {}
       } catch (e) {
         _showError('Failed to load areas for ${city.name}');
-      }
-    } else {
-      for (var area in _currentAreas) {
-        print('   - ${area.areaName}');
       }
     }
   }
@@ -345,26 +333,6 @@ class _SignupScreenState extends State<SignupScreen> {
         content: Text(message),
         backgroundColor: Colors.red,
         duration: const Duration(seconds: 4),
-      ),
-    );
-  }
-
-  void _showSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 4),
-      ),
-    );
-  }
-
-  void _showInfo(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.blue,
-        duration: const Duration(seconds: 2),
       ),
     );
   }

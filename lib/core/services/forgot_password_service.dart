@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config/app_config.dart';
 
 class ForgotPasswordService {
-  static const String baseUrl = 'https://7c3591ea9167.ngrok-free.app/api/v1';
+  static final _config = AppConfig.instance;
+  static String get baseUrl => _config.baseUrl;
 
   /// Send OTP to email
   Future<Map<String, dynamic>> sendOTP({required String email}) async {

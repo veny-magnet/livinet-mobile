@@ -13,6 +13,14 @@ Thumbs.db
 .swiftpm/
 migrate_working_dir/
 
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+google-services.json
+GoogleService-Info.plist
+
 # IntelliJ / Android Studio
 *.iml
 *.ipr

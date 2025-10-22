@@ -38,9 +38,11 @@ class BillHistory {
       paymentDate: json['payment_date']?.toString(),
       invoiceId: json['invoice_id']?.toString() ?? '',
       midtransOrderId: json['midtrans_order_id']?.toString() ?? '',
-      userAddressId: json['user_address_id'] != null ? 
-        int.tryParse(json['user_address_id'].toString()) : null,
-      createdAt: json['create_at']?.toString() ?? json['created_at']?.toString() ?? '',
+      userAddressId: json['user_address_id'] != null
+          ? int.tryParse(json['user_address_id'].toString())
+          : null,
+      createdAt:
+          json['create_at']?.toString() ?? json['created_at']?.toString() ?? '',
     );
   }
 
@@ -81,5 +83,18 @@ class BillHistory {
     ];
 
     return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'amount': amount,
+      'payment_status': paymentStatus,
+      'invoice_status_whmcs': invoiceStatusWhmcs,
+      'payment_date': paymentDate,
+      'invoice_id': invoiceId,
+      'midtrans_order_id': midtransOrderId,
+      'user_address_id': userAddressId,
+      'created_at': createdAt,
+    };
   }
 }

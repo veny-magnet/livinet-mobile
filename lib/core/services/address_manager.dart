@@ -1,9 +1,11 @@
 import 'address_service.dart';
+import 'app_logger.dart';
 
 class AddressManager {
   static AddressManager? _instance;
   UserAddress? _selectedAddress;
   List<Function(UserAddress?)> _listeners = [];
+  final _logger = AppLogger.instance;
 
   AddressManager._internal();
 
@@ -59,7 +61,7 @@ class AddressManager {
         }
       }
     } catch (e) {
-      print('AddressManager - Error loading default address: $e');
+      _logger.error('Error loading default address', e);
     }
   }
 

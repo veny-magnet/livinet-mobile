@@ -175,11 +175,6 @@ class _OrderDialogState extends State<OrderDialog> {
                   'A new bill has been generated and added to your account.',
                   style: TextStyle(fontFamily: 'Open Sans'),
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  'You will be redirected to the home page.',
-                  style: TextStyle(fontFamily: 'Open Sans'),
-                ),
               ],
             ),
             actions: [

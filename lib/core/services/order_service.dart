@@ -1,13 +1,15 @@
 import '../services/base_api_service.dart';
 import '../models/order_models.dart';
+import 'app_logger.dart';
 
 class OrderService {
   static final OrderService _instance = OrderService._internal();
   static OrderService get instance => _instance;
-  
+
   OrderService._internal();
 
   final BaseApiService _apiService = BaseApiService();
+  final _logger = AppLogger.instance;
 
   Future<Map<String, dynamic>> createOrder(OrderRequest request) async {
     try {
@@ -24,16 +26,11 @@ class OrderService {
           'data': response.data,
         };
       } else {
-        return {
-          'success': false,
-          'message': response.message,
-        };
+        return {'success': false, 'message': response.message};
       }
     } catch (e) {
-      return {
-        'success': false,
-        'message': 'Failed to create order: $e',
-      };
+      _logger.error('Failed to create order', e);
+      return {'success': false, 'message': 'Failed to create order: $e'};
     }
   }
 }

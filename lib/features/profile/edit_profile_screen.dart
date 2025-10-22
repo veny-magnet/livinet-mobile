@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/services/user_profile_service.dart';
+import '../../core/services/profile_update_service.dart';
+import '../../core/services/auth_service.dart';
 import '../../core/widgets/confirmation_dialog.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -135,6 +137,128 @@ class _EditProfileScreenState extends State<EditProfileScreen>
       setState(() {
         isLoading = false;
       });
+    }
+  }
+
+  Future<void> _updateProfile() async {
+    try {
+      // Get user ID
+      final authService = AuthService();
+      final currentUser = await authService.getCurrentUser();
+
+      if (currentUser == null || currentUser['user_id'] == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('User session not found. Please login again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      final userId = currentUser['user_id'] as String;
+
+      // Get original profile data
+      final profileResult = await UserProfileService.instance.getUserProfile(
+        userId,
+      );
+
+      if (profileResult['success'] != true) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to load profile data'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      final originalProfile = profileResult['data'];
+      bool hasChanges = false;
+
+      // Check if email changed
+      if (_emailController.text != originalProfile.email) {
+        final result = await ProfileUpdateService.instance.updateEmail(
+          userId: userId,
+          newEmail: _emailController.text,
+        );
+
+        if (result['success'] == true) {
+          hasChanges = true;
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(result['message'] ?? 'Failed to update email'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      // Check if phone changed
+      if (_phoneController.text != originalProfile.phone) {
+        final result = await ProfileUpdateService.instance.updatePhone(
+          userId: userId,
+          oldPhone: originalProfile.phone ?? '',
+          newPhone: _phoneController.text,
+        );
+
+        if (result['success'] == true) {
+          hasChanges = true;
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(result['message'] ?? 'Failed to update phone'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      if (hasChanges) {
+        // Clear cache and reload profile
+        UserProfileService.instance.clearCache();
+        await _loadUserProfile();
+
+        if (mounted) {
+          DialogHelper.showSuccess(
+            context,
+            title: 'Success',
+            message: 'Profile updated successfully!',
+            onConfirm: () {
+              Navigator.of(context).pop();
+            },
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No changes detected'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -543,16 +667,7 @@ class _EditProfileScreenState extends State<EditProfileScreen>
             width: double.infinity,
             height: 50,
             child: ElevatedButton(
-              onPressed: () {
-                DialogHelper.showSuccess(
-                  context,
-                  title: 'Success',
-                  message: 'Profile updated successfully!',
-                  onConfirm: () {
-                    // Optional: Navigate back or refresh
-                  },
-                );
-              },
+              onPressed: _updateProfile,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF4CB04C),
                 foregroundColor: Colors.white,

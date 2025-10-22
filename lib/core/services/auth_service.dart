@@ -2,11 +2,16 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/app_config.dart';
+import '../config/secure_storage.dart';
+import 'app_logger.dart';
 
 class AuthService {
-  static const String baseUrl = 'https://7c3591ea9167.ngrok-free.app/api/v1';
-  static const String apiServer = 'LIVINET_API_SERVER';
-  static const String apiKey = 'LIVINET_API_KEY_12345';
+  static final _config = AppConfig.instance;
+  static final _secureStorage = SecureStorage.instance;
+  static final _logger = AppLogger.instance;
+  static String get apiServer => _config.apiServer;
+  static String get apiKey => _config.apiKey;
 
   // Login method
   Future<Map<String, dynamic>> login({
@@ -17,7 +22,7 @@ class AuthService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/insert/sign'),
+        Uri.parse('${_config.baseUrl}/insert/sign'),
         headers: {
           'Content-Type': 'application/json',
           'ngrok-skip-browser-warning': 'true',
@@ -38,6 +43,17 @@ class AuthService {
       if (response.statusCode == 200 && responseData['success'] == true) {
         // Save token and user data
         await _saveUserSession(responseData['data']);
+
+        // Set user identifier for crash reports
+        if (responseData['data']['user_id'] != null) {
+          _logger.setUserIdentifier(
+            responseData['data']['user_id'].toString(),
+            email: responseData['data']['email'],
+            name: responseData['data']['name'],
+          );
+        }
+
+        _logger.info('User logged in successfully');
 
         return {
           'success': true,
@@ -66,7 +82,7 @@ class AuthService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/send/emailsend'),
+        Uri.parse('${_config.baseUrl}/send/emailsend'),
         headers: {
           'Content-Type': 'application/json',
           'ngrok-skip-browser-warning': 'true',
@@ -120,9 +136,7 @@ class AuthService {
   // Check if user is logged in
   Future<bool> isLoggedIn() async {
     try {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      String? token = prefs.getString('auth_token');
-      return token != null && token.isNotEmpty;
+      return await _secureStorage.isAuthenticated();
     } catch (e) {
       return false;
     }
@@ -146,8 +160,7 @@ class AuthService {
   // Get auth token
   Future<String?> getAuthToken() async {
     try {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      return prefs.getString('auth_token');
+      return await _secureStorage.getAccessToken();
     } catch (e) {
       return null;
     }
@@ -155,24 +168,44 @@ class AuthService {
 
   // Private method to save user session
   Future<void> _saveUserSession(Map<String, dynamic> userData) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-
-    // Save token
+    // Save token to secure storage
     if (userData['token'] != null) {
-      await prefs.setString('auth_token', userData['token']);
+      await _secureStorage.saveAccessToken(userData['token']);
     }
 
-    // Save user data
-    await prefs.setString('user_data', jsonEncode(userData));
+    // Save refresh token if available
+    if (userData['refresh_token'] != null) {
+      await _secureStorage.saveRefreshToken(userData['refresh_token']);
+    }
 
-    // Save login timestamp
+    // Save user ID
+    if (userData['user_id'] != null) {
+      await _secureStorage.saveUserId(userData['user_id'].toString());
+    }
+
+    // Save user email
+    if (userData['email'] != null) {
+      await _secureStorage.saveUserEmail(userData['email']);
+    }
+
+    // Save user name
+    if (userData['name'] != null) {
+      await _secureStorage.saveUserName(userData['name']);
+    }
+
+    // Save full user data to SharedPreferences (non-sensitive data)
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_data', jsonEncode(userData));
     await prefs.setString('login_time', DateTime.now().toIso8601String());
   }
 
   // Private method to clear user session
   Future<void> _clearUserSession() async {
+    // Clear secure storage
+    await _secureStorage.clearAll();
+
+    // Clear SharedPreferences
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.remove('auth_token');
     await prefs.remove('user_data');
     await prefs.remove('login_time');
   }

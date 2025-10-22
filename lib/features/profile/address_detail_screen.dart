@@ -204,7 +204,7 @@ class _AddressDetailScreenState extends State<AddressDetailScreen> {
                         const SizedBox(height: 8),
 
                         const Text(
-                          'Address (Editable)',
+                          'Address',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
@@ -222,7 +222,7 @@ class _AddressDetailScreenState extends State<AddressDetailScreen> {
                         const SizedBox(height: 12),
 
                         const Text(
-                          'Area (Read Only)',
+                          'Area',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
@@ -240,7 +240,7 @@ class _AddressDetailScreenState extends State<AddressDetailScreen> {
                         const SizedBox(height: 12),
 
                         const Text(
-                          'City (Read Only)',
+                          'City',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
@@ -258,7 +258,7 @@ class _AddressDetailScreenState extends State<AddressDetailScreen> {
                         const SizedBox(height: 12),
 
                         const Text(
-                          'State (Read Only)',
+                          'State',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
@@ -276,7 +276,7 @@ class _AddressDetailScreenState extends State<AddressDetailScreen> {
                         const SizedBox(height: 12),
 
                         const Text(
-                          'Postcode (Read Only)',
+                          'Postcode',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
@@ -295,7 +295,7 @@ class _AddressDetailScreenState extends State<AddressDetailScreen> {
                         const SizedBox(height: 12),
 
                         const Text(
-                          'Country (Read Only)',
+                          'Country',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,

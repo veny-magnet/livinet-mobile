@@ -1,6 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
+import '../config/app_config.dart';
+import 'app_logger.dart';
+import '../cache/cache_manager.dart';
+import '../cache/cache.dart';
 
 class UserAddress {
   final String userId;
@@ -64,12 +68,13 @@ class UserAddress {
 }
 
 class AddressService {
-  static const String baseUrl = 'https://7c3591ea9167.ngrok-free.app/api/v1';
+  final _config = AppConfig.instance;
+  final _logger = AppLogger.instance;
+  final _cacheManager = CacheManager.instance;
+
+  static const String CACHE_VERSION = '1.0.0';
 
   static AddressService? _instance;
-  Map<String, List<UserAddress>> _cachedAddressesByUser = {};
-  Map<String, DateTime> _lastFetchByUser = {};
-  static const Duration _cacheExpiry = Duration(minutes: 10);
 
   AddressService._internal();
 
@@ -79,17 +84,43 @@ class AddressService {
   }
 
   /// Get user addresses with authentication
-  Future<Map<String, dynamic>> getUserAddresses(String userId) async {
+  Future<Map<String, dynamic>> getUserAddresses(
+    String userId, {
+    bool forceRefresh = false,
+  }) async {
     try {
-      // Check if we have a valid cached addresses for this specific user
-      if (_cachedAddressesByUser.containsKey(userId) &&
-          _lastFetchByUser.containsKey(userId) &&
-          DateTime.now().difference(_lastFetchByUser[userId]!) < _cacheExpiry) {
-        return {
-          'success': true,
-          'data': _cachedAddressesByUser[userId],
-          'message': 'Addresses fetched from cache',
-        };
+      final cacheKey = 'addresses_$userId';
+
+      // Define cache configuration: 30 min fresh, 4 hours stale (addresses rarely change)
+      final cacheConfig = CacheConfig(
+        maxAge: const Duration(minutes: 30),
+        staleAge: const Duration(hours: 4),
+        strategy: CacheStrategy.cacheFirst,
+        version: CACHE_VERSION,
+      );
+
+      // Check cache first unless force refresh
+      if (!forceRefresh) {
+        final cached = await _cacheManager.get<List<UserAddress>>(
+          cacheKey,
+          cacheConfig,
+          (json) {
+            final addressesData = json['addresses'] as List;
+            return addressesData
+                .map(
+                  (item) => UserAddress.fromJson(item as Map<String, dynamic>),
+                )
+                .toList();
+          },
+        );
+
+        if (cached != null) {
+          return {
+            'success': true,
+            'data': cached.data,
+            'message': 'Addresses fetched from cache',
+          };
+        }
       }
 
       // Get auth token
@@ -105,7 +136,7 @@ class AddressService {
 
       final response = await http.get(
         Uri.parse(
-          '$baseUrl/get/listaddress',
+          '${_config.baseUrl}/get/listaddress',
         ).replace(queryParameters: {'user_id': userId}),
         headers: {
           'Content-Type': 'application/json',
@@ -115,8 +146,8 @@ class AddressService {
         },
       );
 
-      print('AddressService - Response status: ${response.statusCode}');
-      print('AddressService - Response body: ${response.body}');
+      _logger.debug('Response status: ${response.statusCode}');
+      _logger.debug('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
@@ -124,15 +155,19 @@ class AddressService {
         if (responseData['code'] == 200 && responseData['success'] == true) {
           final List<dynamic> addressesData = responseData['data'] ?? [];
 
-          // Cache the addresses for this specific user
-          _cachedAddressesByUser[userId] = addressesData
+          // Parse addresses
+          final addresses = addressesData
               .map((json) => UserAddress.fromJson(json))
               .toList();
-          _lastFetchByUser[userId] = DateTime.now();
+
+          // Store in cache
+          await _cacheManager.set(cacheKey, {
+            'addresses': addresses.map((a) => a.toJson()).toList(),
+          }, cacheConfig);
 
           return {
             'success': true,
-            'data': _cachedAddressesByUser[userId],
+            'data': addresses,
             'message':
                 responseData['message'] ?? 'Addresses fetched successfully',
           };
@@ -157,7 +192,7 @@ class AddressService {
         };
       }
     } catch (e) {
-      print('AddressService - Error: $e');
+      _logger.error('Error getting user addresses', e);
       return {
         'success': false,
         'message': 'Network error: ${e.toString()}',
@@ -177,38 +212,28 @@ class AddressService {
       }
       return null;
     } catch (e) {
-      print('AddressService - Error getting primary address: $e');
+      _logger.error('Error getting primary address', e);
       return null;
     }
   }
 
   /// Clear cached addresses
-  void clearCache({String? userId}) {
+  Future<void> clearCache({String? userId}) async {
     if (userId != null) {
       // Clear cache for specific user
-      _cachedAddressesByUser.remove(userId);
-      _lastFetchByUser.remove(userId);
+      final cacheKey = 'addresses_$userId';
+      await _cacheManager.invalidate(cacheKey);
+      _logger.debug('Cleared address cache for user: $userId');
     } else {
-      // Clear all cache
-      _cachedAddressesByUser.clear();
-      _lastFetchByUser.clear();
+      // Clear all address cache
+      await _cacheManager.invalidatePattern(r'^addresses_.*');
+      _logger.debug('Cleared all address cache');
     }
-  }
-
-  /// Get cached addresses without making API call
-  List<UserAddress>? getCachedAddresses(String userId) {
-    if (_cachedAddressesByUser.containsKey(userId) &&
-        _lastFetchByUser.containsKey(userId) &&
-        DateTime.now().difference(_lastFetchByUser[userId]!) < _cacheExpiry) {
-      return _cachedAddressesByUser[userId];
-    }
-    return null;
   }
 
   /// Force refresh addresses (bypass cache)
   Future<Map<String, dynamic>> refreshAddresses(String userId) async {
-    clearCache(userId: userId);
-    return await getUserAddresses(userId);
+    return await getUserAddresses(userId, forceRefresh: true);
   }
 
   /// Update existing address
@@ -235,10 +260,10 @@ class AddressService {
         'address': address,
       };
 
-      print('AddressService - Updating address with body: $body');
+      _logger.debug('Updating address with body: $body');
 
       final response = await http.put(
-        Uri.parse('$baseUrl/update/updateaddress'),
+        Uri.parse('${_config.baseUrl}/update/updateaddress'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -248,8 +273,8 @@ class AddressService {
         body: jsonEncode(body),
       );
 
-      print('AddressService - Update response status: ${response.statusCode}');
-      print('AddressService - Update response body: ${response.body}');
+      _logger.info('Update address response - status: ${response.statusCode}');
+      _logger.debug('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
@@ -285,7 +310,7 @@ class AddressService {
         };
       }
     } catch (e) {
-      print('AddressService - Error updating address: $e');
+      _logger.error('Error updating address', e);
       return {
         'success': false,
         'message': 'Network error: ${e.toString()}',
@@ -324,10 +349,10 @@ class AddressService {
         'postcode': postcode,
       };
 
-      print('AddressService - Adding address with body: $body');
+      _logger.debug('Adding address with body: $body');
 
       final response = await http.post(
-        Uri.parse('$baseUrl/add/address'),
+        Uri.parse('${_config.baseUrl}/add/address'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -337,8 +362,8 @@ class AddressService {
         body: jsonEncode(body),
       );
 
-      print('AddressService - Add response status: ${response.statusCode}');
-      print('AddressService - Add response body: ${response.body}');
+      _logger.info('Add address response - status: ${response.statusCode}');
+      _logger.debug('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
@@ -373,7 +398,7 @@ class AddressService {
         };
       }
     } catch (e) {
-      print('AddressService - Error adding address: $e');
+      _logger.error('Error adding address', e);
       return {
         'success': false,
         'message': 'Network error: ${e.toString()}',
@@ -401,10 +426,10 @@ class AddressService {
 
       final body = {'user_id': userId, 'address_id': addressId};
 
-      print('AddressService - Deleting address with body: $body');
+      _logger.debug('Deleting address with body: $body');
 
       final response = await http.delete(
-        Uri.parse('$baseUrl/delete/deleteaddress'),
+        Uri.parse('${_config.baseUrl}/delete/deleteaddress'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -414,8 +439,8 @@ class AddressService {
         body: jsonEncode(body),
       );
 
-      print('AddressService - Delete response status: ${response.statusCode}');
-      print('AddressService - Delete response body: ${response.body}');
+      _logger.info('Delete address response - status: ${response.statusCode}');
+      _logger.debug('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
@@ -451,7 +476,7 @@ class AddressService {
         };
       }
     } catch (e) {
-      print('AddressService - Error deleting address: $e');
+      _logger.error('Error deleting address', e);
       return {
         'success': false,
         'message': 'Network error: ${e.toString()}',

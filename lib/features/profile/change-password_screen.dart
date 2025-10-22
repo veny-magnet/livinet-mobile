@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../core/services/password_reset_service.dart';
+import '../../core/services/profile_update_service.dart';
+import '../../core/services/auth_service.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({Key? key}) : super(key: key);
@@ -135,39 +138,137 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       // Haptic feedback
       HapticFeedback.lightImpact();
 
-      // TODO: Implement actual password change API call
-      // Example:
-      // await PasswordService.changePassword(
-      //   currentPassword: _currentPasswordController.text,
-      //   newPassword: _newPasswordController.text,
-      // );
+      print('ChangePasswordScreen: Getting user ID from AuthService');
 
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 2));
+      // Get user ID from AuthService
+      final authService = AuthService();
+      final currentUser = await authService.getCurrentUser();
+
+      if (currentUser == null || currentUser['user_id'] == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.error, color: Colors.white),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text('User session not found. Please login again.'),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          );
+        }
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final userId = currentUser['user_id'] as String;
+
+      print('ChangePasswordScreen: Calling manual changePassword API');
+
+      // Call the manual password change API (not reset)
+      final result = await ProfileUpdateService.instance.changePassword(
+        userId: userId,
+        oldPassword: _currentPasswordController.text,
+        newPassword: _newPasswordController.text,
+        confirmPassword: _confirmPasswordController.text,
+      );
+
+      print('ChangePasswordScreen: API result: $result');
 
       if (mounted) {
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Password changed successfully'),
-              ],
+        if (result['success'] == true) {
+          // Show success dialog
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                title: const Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      color: Color(0xFF4CB04C),
+                      size: 28,
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      'Success',
+                      style: TextStyle(
+                        fontFamily: 'Open Sans',
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                content: Text(
+                  result['message'] ?? 'Password changed successfully',
+                  style: const TextStyle(
+                    fontFamily: 'Open Sans',
+                    fontSize: 14,
+                    height: 1.4,
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(); // Close dialog
+                      Navigator.of(
+                        context,
+                      ).pop(); // Close change password screen
+                    },
+                    child: const Text(
+                      'OK',
+                      style: TextStyle(
+                        fontFamily: 'Open Sans',
+                        color: Color(0xFF4CB04C),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          );
+        } else {
+          // Show error message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.error, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      result['message'] ?? 'Failed to change password',
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-            backgroundColor: const Color(0xFF4CB04C),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        );
-
-        // Navigate back
-        Navigator.of(context).pop();
+          );
+        }
       }
     } catch (e) {
+      print('ChangePasswordScreen: Exception: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -175,9 +276,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               children: [
                 const Icon(Icons.error, color: Colors.white),
                 const SizedBox(width: 12),
-                Expanded(
-                  child: Text('Failed to change password: ${e.toString()}'),
-                ),
+                Expanded(child: Text('Network error: ${e.toString()}')),
               ],
             ),
             backgroundColor: Colors.red,
@@ -258,14 +357,35 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Header
-                          Text(
-                            'Make sure your new password is strong and easy to remember',
-                            style: TextStyle(
-                              fontFamily: 'Open Sans',
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                              height: 1.4,
+                          // Info Banner
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.blue[50],
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.blue[200]!),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  color: Colors.blue[700],
+                                  size: 24,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'Enter your current password and choose a new secure password.',
+                                    style: TextStyle(
+                                      fontFamily: 'Open Sans',
+                                      fontSize: 13,
+                                      color: Colors.blue[900],
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(height: 24),

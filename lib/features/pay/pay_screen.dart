@@ -9,10 +9,11 @@ import '../../core/widgets/no_plan_widget.dart';
 import '../../core/services/user_profile_service.dart';
 import '../../core/services/bill_service.dart';
 import 'bill_detail_screen.dart';
-import '../../core/services/subscription_service.dart';
 import '../../core/services/address_service.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/order_details_service.dart';
 import '../../core/models/bill_models.dart';
+import '../../core/models/order_detail_models.dart' as order_detail;
 
 class PayScreen extends StatefulWidget {
   const PayScreen({super.key});
@@ -26,9 +27,11 @@ class _PayScreenState extends State<PayScreen> {
   String userId = '';
   bool isLoading = true;
   List<BillHistory> billHistory = [];
+  order_detail.OrderDetailsResponse? orderDetailsData;
+  order_detail.OrderDetail? currentOrderDetail;
   String errorMessage = '';
   int? selectedAddressId;
-  String currentPlanName = ''; // Will be loaded from API
+  String currentPlanName = '';
 
   @override
   void initState() {
@@ -109,7 +112,31 @@ class _PayScreenState extends State<PayScreen> {
         if (addresses.isNotEmpty) {
           selectedAddressId = addresses.first.addressId;
 
-          // Get bill history
+          // Load OrderDetails for BillCard only
+          print('PayScreen: Loading OrderDetails for BillCard...');
+          final orderDetailsService = OrderDetailsService();
+          final orderDetailsResponse = await orderDetailsService
+              .getOrderDetails(
+                userId: userId,
+                userAddressId: selectedAddressId!,
+              );
+
+          if (orderDetailsResponse != null &&
+              orderDetailsResponse.orders.isNotEmpty) {
+            setState(() {
+              orderDetailsData = orderDetailsResponse;
+              currentOrderDetail = orderDetailsResponse.orders.first;
+            });
+            await _loadCurrentPlanName();
+          } else {
+            setState(() {
+              orderDetailsData = null;
+              currentOrderDetail = null;
+            });
+          }
+
+          // Load BillHistory for Payment History section
+          print('PayScreen: Loading BillHistory for Payment History...');
           final billRequest = BillHistoryRequest(
             userId: userId,
             userAddressId: selectedAddressId!,
@@ -122,42 +149,11 @@ class _PayScreenState extends State<PayScreen> {
               billHistory = result['data'] as List<BillHistory>;
               isLoading = false;
             });
-
-            // Load plan name after getting bill history
-            await _loadCurrentPlanName();
           } else {
-            // Fallback to subscription service if bill history fails
-            print('Bill history failed, trying subscription service...');
-            try {
-              final subscriptionResult = await SubscriptionService.instance
-                  .getUserSubscriptions(userId);
-              if (subscriptionResult['success'] == true &&
-                  subscriptionResult['data'] != null) {
-                final subscriptionBills = SubscriptionService.instance
-                    .convertSubscriptionsToBills(
-                      subscriptionResult['data'] as Map<String, dynamic>,
-                    );
-                setState(() {
-                  billHistory = subscriptionBills;
-                  isLoading = false;
-                });
-
-                // Load plan name after getting subscription bills
-                await _loadCurrentPlanName();
-              } else {
-                setState(() {
-                  errorMessage =
-                      result['message'] ??
-                      'Failed to load bill history and subscriptions';
-                  isLoading = false;
-                });
-              }
-            } catch (e) {
-              setState(() {
-                errorMessage = 'Error loading data: $e';
-                isLoading = false;
-              });
-            }
+            setState(() {
+              billHistory = [];
+              isLoading = false;
+            });
           }
         } else {
           setState(() {
@@ -173,7 +169,7 @@ class _PayScreenState extends State<PayScreen> {
       }
     } catch (e) {
       setState(() {
-        errorMessage = 'Error loading bill history: $e';
+        errorMessage = 'Error loading data: $e';
         isLoading = false;
       });
     }
@@ -181,102 +177,24 @@ class _PayScreenState extends State<PayScreen> {
 
   Future<void> _loadCurrentPlanName() async {
     try {
-      if (userId.isNotEmpty && selectedAddressId != null) {
-        print('PayScreen: Loading subscription data for userId: $userId');
+      // Only use OrderDetails data for plan name
+      if (currentOrderDetail != null) {
+        final planName = currentOrderDetail!.productData.subsplanName.isNotEmpty
+            ? currentOrderDetail!.productData.subsplanName
+            : currentOrderDetail!.productData.productName.isNotEmpty
+            ? currentOrderDetail!.productData.productName
+            : currentOrderDetail!.serviceName;
 
-        // Get subscription data to find the current plan name using subsplanName
-        final subscriptionResult = await SubscriptionService.instance
-            .getUserSubscriptions(userId);
-
-        print('PayScreen: Subscription API response: $subscriptionResult');
-
-        if (subscriptionResult['success'] == true &&
-            subscriptionResult['data'] != null) {
-          final subscriptionData =
-              subscriptionResult['data'] as Map<String, dynamic>;
-
-          print('PayScreen: Subscription data: $subscriptionData');
-
-          final subscriptions =
-              subscriptionData['subscriptions'] as List<dynamic>? ?? [];
-
-          print('PayScreen: Found ${subscriptions.length} subscriptions');
-
-          if (subscriptions.isNotEmpty) {
-            final currentSubscription = subscriptions.first;
-            print(
-              'PayScreen: Current subscription details: $currentSubscription',
-            );
-
-            // Priority: use subsplanName from subscription response
-            final planName =
-                currentSubscription['subsplanName']?.toString() ??
-                currentSubscription['productDescription']?.toString() ??
-                currentSubscription['plan_name']?.toString() ??
-                currentSubscription['name']?.toString();
-
-            print('PayScreen: Extracted plan name: $planName');
-
-            if (planName != null && planName.isNotEmpty) {
-              setState(() {
-                currentPlanName = planName;
-              });
-              print(
-                'PayScreen: Updated plan name from subscription to: $planName',
-              );
-              return;
-            } else {
-              print('PayScreen: No valid plan name found in subscription data');
-            }
-          } else {
-            print('PayScreen: No subscriptions found in response');
-          }
-        } else {
-          print('PayScreen: Subscription API failed or returned no data');
-          print('PayScreen: Success: ${subscriptionResult['success']}');
-          print('PayScreen: Message: ${subscriptionResult['message']}');
+        if (planName.isNotEmpty) {
+          setState(() {
+            currentPlanName = planName;
+          });
+          print('PayScreen: Updated plan name from OrderDetails to: $planName');
         }
-      } else {
-        print(
-          'PayScreen: Cannot load plan name - userId: $userId, selectedAddressId: $selectedAddressId',
-        );
       }
     } catch (e) {
       print('PayScreen: Error loading current plan name: $e');
       // Keep default name if error occurs
-    }
-  }
-
-  void _handlePayPressed() {
-    // Get unpaid bill for payment
-    final unpaidBill = billHistory.where((bill) => !bill.isPaid).firstOrNull;
-
-    if (unpaidBill != null) {
-      // For now, show message that payment feature is coming soon
-      // In real implementation, you would navigate to payment gateway
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Payment for bill ${unpaidBill.invoiceId} - ${unpaidBill.formattedAmount}',
-          ),
-          backgroundColor: Colors.blue,
-          action: SnackBarAction(
-            label: 'Open Payment',
-            onPressed: () {
-              // TODO: Navigate to payment gateway or PaymentScreen
-              print('Open payment for invoice: ${unpaidBill.invoiceId}');
-              print('Midtrans Order ID: ${unpaidBill.midtransOrderId}');
-            },
-          ),
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No unpaid bills found'),
-          backgroundColor: Colors.orange,
-        ),
-      );
     }
   }
 
@@ -311,29 +229,29 @@ class _PayScreenState extends State<PayScreen> {
                 },
               ),
               const SizedBox(height: 10),
-              // Show different BillCard based on bill history
-              billHistory.isEmpty
-                  ? const NoPlanWidget()
-                  : BillCard(
-                      planName: currentPlanName,
-                      billLabel: 'Your Bill',
-                      amount: billHistory.any((bill) => !bill.isPaid)
-                          ? billHistory
-                                .firstWhere((bill) => !bill.isPaid)
-                                .formattedAmount
-                          : billHistory.isNotEmpty
-                          ? billHistory.first.formattedAmount
-                          : 'Rp 0',
-                      status: billHistory.any((bill) => !bill.isPaid)
-                          ? 'UNPAID'
-                          : 'PAID',
-                      billData: billHistory.any((bill) => !bill.isPaid)
-                          ? billHistory.firstWhere((bill) => !bill.isPaid)
-                          : null,
-                      onPayPressed: billHistory.any((bill) => !bill.isPaid)
-                          ? _handlePayPressed
-                          : null,
-                    ),
+              // Show different states based on OrderDetails loading
+              isLoading
+                  ? Container(
+                      height: 120,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Color(0xFF4CB04C),
+                          ),
+                        ),
+                      ),
+                    )
+                  : currentOrderDetail != null
+                  ? BillCard.fromOrderDetail(
+                      orderDetail: currentOrderDetail!,
+                      userId: userId,
+                      userAddressId: selectedAddressId,
+                    )
+                  : const NoPlanWidget(),
             ],
           ),
 
@@ -447,8 +365,7 @@ class _PayScreenState extends State<PayScreen> {
                                   MaterialPageRoute(
                                     builder: (context) => BillDetailScreen(
                                       invoiceId: bill.invoiceId,
-                                      invoiceNumber: bill
-                                          .invoiceId, // Using invoiceId for now
+                                      invoiceNumber: bill.invoiceId,
                                       date: bill.formattedDate,
                                       amount: bill.formattedAmount,
                                       status: bill.displayStatus,

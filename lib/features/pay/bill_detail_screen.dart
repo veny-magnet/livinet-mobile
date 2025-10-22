@@ -38,6 +38,8 @@ class _BillDetailScreenState extends State<BillDetailScreen> {
 
   Future<void> _loadBillDetail() async {
     try {
+      if (!mounted) return; // Check if widget is still mounted
+
       setState(() {
         isLoading = true;
         error = null;
@@ -45,6 +47,7 @@ class _BillDetailScreenState extends State<BillDetailScreen> {
 
       final userInfo = await _authService.getCurrentUser();
       final userId = userInfo?['user_id']?.toString();
+      final authToken = await _authService.getAuthToken();
 
       if (userId == null) {
         throw Exception('User ID not found');
@@ -53,15 +56,36 @@ class _BillDetailScreenState extends State<BillDetailScreen> {
       final detail = await _billService.getBillHistoryDetail(
         invoiceId: widget.invoiceId,
         userId: userId,
+        authToken: authToken,
       );
+
+      if (!mounted) return; // Check again before setState
 
       setState(() {
         billDetail = detail;
         isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return; // Check again before setState
+
+      // Parse error message to be more user-friendly
+      String errorMessage = 'Unable to load invoice details';
+
+      final errorString = e.toString();
+      if (errorString.contains('500')) {
+        errorMessage = 'Server error. Please try again later.';
+      } else if (errorString.contains('404')) {
+        errorMessage = 'Invoice not found.';
+      } else if (errorString.contains('401') || errorString.contains('403')) {
+        errorMessage = 'Authentication error. Please login again.';
+      } else if (errorString.contains('timeout') ||
+          errorString.contains('SocketException')) {
+        errorMessage =
+            'Connection timeout. Please check your internet connection.';
+      }
+
       setState(() {
-        error = e.toString();
+        error = errorMessage;
         isLoading = false;
       });
     }
@@ -70,28 +94,33 @@ class _BillDetailScreenState extends State<BillDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0B1426),
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0B1426),
+        backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.chevron_left, color: Colors.black87, size: 30),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Bill Details',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
+        title: const Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Invoice Details',
+            style: TextStyle(
+              color: Colors.black87,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'Open Sans',
+            ),
           ),
         ),
-        centerTitle: true,
+        titleSpacing: 0,
+        centerTitle: false,
       ),
       body: isLoading
           ? const Center(
               child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE67E22)),
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4CB04C)),
               ),
             )
           : error != null
@@ -104,35 +133,52 @@ class _BillDetailScreenState extends State<BillDetailScreen> {
 
   Widget _buildErrorWidget() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.error_outline, color: Colors.red[400], size: 64),
-          const SizedBox(height: 16),
-          Text(
-            'Error loading bill details',
-            style: TextStyle(
-              color: Colors.grey[400],
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, color: Colors.red[400], size: 64),
+            const SizedBox(height: 16),
+            const Text(
+              'Error loading invoice details',
+              style: TextStyle(
+                color: Colors.black87,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Open Sans',
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            error!,
-            style: TextStyle(color: Colors.grey[600], fontSize: 14),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: _loadBillDetail,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE67E22),
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+            const SizedBox(height: 8),
+            Text(
+              error!,
+              style: const TextStyle(
+                color: Colors.black54,
+                fontSize: 14,
+                fontFamily: 'Open Sans',
+              ),
+              textAlign: TextAlign.center,
             ),
-            child: const Text('Retry', style: TextStyle(color: Colors.white)),
-          ),
-        ],
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _loadBillDetail,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4CB04C),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Retry',
+                style: TextStyle(color: Colors.white, fontFamily: 'Open Sans'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -145,11 +191,12 @@ class _BillDetailScreenState extends State<BillDetailScreen> {
           Icon(Icons.receipt_outlined, color: Colors.grey[400], size: 64),
           const SizedBox(height: 16),
           Text(
-            'No bill details found',
+            'No invoice details found',
             style: TextStyle(
-              color: Colors.grey[400],
+              color: Colors.grey[600],
               fontSize: 18,
               fontWeight: FontWeight.w600,
+              fontFamily: 'Open Sans',
             ),
           ),
         ],
@@ -158,33 +205,58 @@ class _BillDetailScreenState extends State<BillDetailScreen> {
   }
 
   Widget _buildBillDetailContent() {
+    final invoice = billDetail?['invoice'];
+    if (invoice == null) return _buildNoDataWidget();
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildInvoiceHeader(),
-          const SizedBox(height: 24),
-          _buildFinancialSummary(),
-          const SizedBox(height: 24),
-          _buildInvoiceItems(),
-          const SizedBox(height: 24),
-          _buildServiceDetails(),
-          const SizedBox(height: 24),
-          _buildPaymentActions(),
+          _buildInvoiceHeader(invoice),
+          const SizedBox(height: 16),
+          _buildFinancialSummary(invoice),
           const SizedBox(height: 32),
         ],
       ),
     );
   }
 
-  Widget _buildInvoiceHeader() {
+  String _formatDate(String dateStr) {
+    try {
+      final date = DateTime.parse(dateStr);
+      const months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
+      return '${date.day} ${months[date.month - 1]} ${date.year}';
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
+  Widget _buildInvoiceHeader(Map<String, dynamic> invoice) {
+    final status = invoice['status']?.toString() ?? 'Unknown';
+    final invoiceNum =
+        invoice['invoicenum']?.toString() ?? widget.invoiceNumber;
+    final date = invoice['date']?.toString() ?? '';
+    final dueDate = invoice['duedate']?.toString() ?? '';
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A2332),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF2A3441), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -192,39 +264,89 @@ class _BillDetailScreenState extends State<BillDetailScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Invoice #${widget.invoiceNumber}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Invoice Number',
+                      style: TextStyle(
+                        color: Colors.black54,
+                        fontSize: 12,
+                        fontFamily: 'Open Sans',
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '#$invoiceNum',
+                      style: const TextStyle(
+                        color: Colors.black87,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Open Sans',
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              _buildStatusBadge(widget.status),
+              _buildStatusBadge(status),
             ],
           ),
           const SizedBox(height: 16),
+          const Divider(color: Color(0xFFE5E7EB)),
+          const SizedBox(height: 16),
           Row(
             children: [
-              Icon(Icons.calendar_today, color: Colors.grey[400], size: 16),
-              const SizedBox(width: 8),
-              Text(
-                'Date: ${widget.date}',
-                style: TextStyle(color: Colors.grey[400], fontSize: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Invoice Date',
+                      style: TextStyle(
+                        color: Colors.black54,
+                        fontSize: 12,
+                        fontFamily: 'Open Sans',
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _formatDate(date),
+                      style: const TextStyle(
+                        color: Colors.black87,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Open Sans',
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(Icons.attach_money, color: Colors.grey[400], size: 16),
-              const SizedBox(width: 8),
-              Text(
-                'Amount: ${widget.amount}',
-                style: const TextStyle(
-                  color: Color(0xFFE67E22),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Due Date',
+                      style: TextStyle(
+                        color: Colors.black54,
+                        fontSize: 12,
+                        fontFamily: 'Open Sans',
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _formatDate(dueDate),
+                      style: TextStyle(
+                        color: status.toLowerCase() == 'unpaid'
+                            ? Colors.red[700]
+                            : Colors.black87,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Open Sans',
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -268,386 +390,216 @@ class _BillDetailScreenState extends State<BillDetailScreen> {
     );
   }
 
-  Widget _buildFinancialSummary() {
-    final invoice = billDetail?['invoice'];
-    if (invoice == null) return const SizedBox.shrink();
+  Widget _buildFinancialSummary(Map<String, dynamic> invoice) {
+    final subtotal = invoice['subtotal']?.toString() ?? '0';
+    final tax = invoice['tax']?.toString() ?? '0';
+    final taxRate = invoice['taxrate']?.toString() ?? '0';
+    final total = invoice['total']?.toString() ?? '0';
+    final balance = invoice['balance']?.toString() ?? total;
+    final amountPaid = invoice['amountPaid']?.toString() ?? '0';
+    final paymentMethod =
+        invoice['paymentGatewayName']?.toString() ??
+        invoice['paymentmethod']?.toString() ??
+        'N/A';
+    final credit = invoice['credit']?.toString() ?? '0';
+
+    // Get items from billDetail
+    final items = billDetail?['invoiceitems'] as List<dynamic>? ?? [];
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A2332),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF2A3441), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Financial Summary',
+            'Payment Summary',
             style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          _buildSummaryRow(
-            'Subtotal',
-            invoice['subtotal']?.toString() ?? '0.00',
-          ),
-          _buildSummaryRow('Tax', invoice['taxrate']?.toString() ?? '0.00'),
-          _buildSummaryRow(
-            'Discount',
-            invoice['discount']?.toString() ?? '0.00',
-          ),
-          const Divider(color: Color(0xFF2A3441), height: 24),
-          _buildSummaryRow(
-            'Total',
-            invoice['total']?.toString() ?? '0.00',
-            isTotal: true,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryRow(String label, String value, {bool isTotal = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: isTotal ? Colors.white : Colors.grey[400],
-              fontSize: isTotal ? 16 : 14,
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-          Text(
-            '\$${value}',
-            style: TextStyle(
-              color: isTotal ? const Color(0xFFE67E22) : Colors.white,
-              fontSize: isTotal ? 16 : 14,
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInvoiceItems() {
-    final items = billDetail?['invoiceitems'] as List<dynamic>?;
-    if (items == null || items.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A2332),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF2A3441), width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Invoice Items',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ...items.map((item) => _buildInvoiceItem(item)).toList(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInvoiceItem(Map<String, dynamic> item) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0B1426),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF2A3441), width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            item['description']?.toString() ?? 'No description',
-            style: const TextStyle(
-              color: Colors.white,
+              color: Colors.black87,
               fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Amount: \$${item['amount']?.toString() ?? '0.00'}',
-                style: TextStyle(color: Colors.grey[400], fontSize: 14),
-              ),
-              if (item['taxed'] == '1')
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Text(
-                    'Taxed',
-                    style: TextStyle(color: Colors.blue, fontSize: 12),
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildServiceDetails() {
-    final serviceDetails = billDetail?['servicedetails'] as List<dynamic>?;
-    if (serviceDetails == null || serviceDetails.isEmpty)
-      return const SizedBox.shrink();
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A2332),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF2A3441), width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Service Details',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
               fontWeight: FontWeight.bold,
+              fontFamily: 'Open Sans',
             ),
           ),
           const SizedBox(height: 16),
-          ...serviceDetails
-              .map((service) => _buildServiceDetail(service))
-              .toList(),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildServiceDetail(Map<String, dynamic> service) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0B1426),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF2A3441), width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  service['product_name']?.toString() ?? 'Unknown Service',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: service['status'] == 'Active'
-                      ? Colors.green.withOpacity(0.2)
-                      : Colors.grey.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  service['status']?.toString() ?? 'Unknown',
-                  style: TextStyle(
-                    color: service['status'] == 'Active'
-                        ? Colors.green
-                        : Colors.grey,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
-          ),
+          // Payment Method
+          _buildInfoRow('Payment Method', paymentMethod),
           const SizedBox(height: 8),
-          if (service['domain'] != null)
-            Text(
-              'Domain: ${service['domain']}',
-              style: TextStyle(color: Colors.grey[400], fontSize: 14),
-            ),
-          if (service['billing_cycle'] != null)
-            Text(
-              'Billing Cycle: ${service['billing_cycle']}',
-              style: TextStyle(color: Colors.grey[400], fontSize: 14),
-            ),
-          if (service['next_due_date'] != null)
-            Text(
-              'Next Due: ${service['next_due_date']}',
-              style: TextStyle(color: Colors.grey[400], fontSize: 14),
-            ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildPaymentActions() {
-    if (widget.status.toLowerCase() == 'paid') {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.green.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.green.withOpacity(0.3), width: 1),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.green, size: 24),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'This invoice has been paid successfully',
-                style: TextStyle(
-                  color: Colors.green,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+          // Items breakdown
+          if (items.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Text(
+              'Invoice Items:',
+              style: TextStyle(
+                color: Colors.black54,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Open Sans',
               ),
+            ),
+            const SizedBox(height: 8),
+            ...items.asMap().entries.map((entry) {
+              final item = entry.value as Map<String, dynamic>;
+              final description = item['description']?.toString() ?? '';
+              final amount = item['amount']?.toString() ?? '0';
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('  • ', style: TextStyle(color: Colors.black54)),
+                    Expanded(
+                      child: Text(
+                        description,
+                        style: const TextStyle(
+                          color: Colors.black54,
+                          fontSize: 12,
+                          fontFamily: 'Open Sans',
+                        ),
+                      ),
+                    ),
+                    Text(
+                      _formatCurrency(amount),
+                      style: const TextStyle(
+                        color: Colors.black87,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Open Sans',
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+            const SizedBox(height: 12),
+          ],
+
+          const Divider(color: Color(0xFFE5E7EB)),
+          const SizedBox(height: 12),
+
+          // Financial breakdown
+          _buildSummaryRow('Subtotal', subtotal),
+          const SizedBox(height: 8),
+          _buildSummaryRow('Tax ($taxRate%)', tax),
+
+          // Credit if any
+          if (double.tryParse(credit) != null &&
+              double.tryParse(credit)! > 0) ...[
+            const SizedBox(height: 8),
+            _buildSummaryRow(
+              'Credit',
+              credit,
+              valueColor: const Color(0xFF4CB04C),
             ),
           ],
-        ),
-      );
-    }
 
-    return Column(
+          // Amount paid if any
+          if (double.tryParse(amountPaid) != null &&
+              double.tryParse(amountPaid)! > 0) ...[
+            const SizedBox(height: 8),
+            _buildSummaryRow(
+              'Amount Paid',
+              amountPaid,
+              valueColor: const Color(0xFF4CB04C),
+            ),
+          ],
+
+          const SizedBox(height: 12),
+          const Divider(color: Color(0xFFE5E7EB)),
+          const SizedBox(height: 12),
+
+          // Total and Balance
+          _buildSummaryRow('Total Amount', total, isTotal: true),
+          if (balance != total) ...[
+            const SizedBox(height: 8),
+            _buildSummaryRow(
+              'Balance Due',
+              balance,
+              isTotal: true,
+              valueColor: Colors.red[700]!,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () {
-              // TODO: Navigate to payment screen
-              _showPaymentDialog();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE67E22),
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text(
-              'Pay Now',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.black54,
+            fontSize: 14,
+            fontFamily: 'Open Sans',
           ),
         ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton(
-            onPressed: () {
-              // TODO: Download invoice functionality
-              _showDownloadDialog();
-            },
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Color(0xFFE67E22)),
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text(
-              'Download Invoice',
-              style: TextStyle(
-                color: Color(0xFFE67E22),
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.black87,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            fontFamily: 'Open Sans',
           ),
         ),
       ],
     );
   }
 
-  void _showPaymentDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF1A2332),
-          title: const Text('Payment', style: TextStyle(color: Colors.white)),
-          content: const Text(
-            'Payment functionality will be implemented soon.',
-            style: TextStyle(color: Colors.grey),
+  Widget _buildSummaryRow(
+    String label,
+    String value, {
+    bool isTotal = false,
+    Color? valueColor,
+  }) {
+    String formattedValue = _formatCurrency(value);
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: isTotal ? Colors.black87 : Colors.black54,
+            fontSize: isTotal ? 16 : 14,
+            fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+            fontFamily: 'Open Sans',
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'OK',
-                style: TextStyle(color: Color(0xFFE67E22)),
-              ),
-            ),
-          ],
-        );
-      },
+        ),
+        Text(
+          formattedValue,
+          style: TextStyle(
+            color: valueColor ?? (isTotal ? Colors.black87 : Colors.black87),
+            fontSize: isTotal ? 16 : 14,
+            fontWeight: isTotal ? FontWeight.bold : FontWeight.w600,
+            fontFamily: 'Open Sans',
+          ),
+        ),
+      ],
     );
   }
 
-  void _showDownloadDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF1A2332),
-          title: const Text(
-            'Download Invoice',
-            style: TextStyle(color: Colors.white),
-          ),
-          content: const Text(
-            'Invoice download functionality will be implemented soon.',
-            style: TextStyle(color: Colors.grey),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'OK',
-                style: TextStyle(color: Color(0xFFE67E22)),
-              ),
-            ),
-          ],
-        );
-      },
-    );
+  String _formatCurrency(String value) {
+    try {
+      final amount = double.tryParse(value) ?? 0;
+      return 'Rp ${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}';
+    } catch (e) {
+      return 'Rp $value';
+    }
   }
 }

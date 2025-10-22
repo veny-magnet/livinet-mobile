@@ -1,36 +1,26 @@
 {
   "project_info": {
-    "project_number": "123456789012",
-    "project_id": "livinet-mobile-app",
-    "storage_bucket": "livinet-mobile-app.appspot.com"
+    "project_number": "979166255195",
+    "project_id": "livinet",
+    "storage_bucket": "livinet.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:123456789012:android:abcdef123456789",
+        "mobilesdk_app_id": "1:979166255195:android:9c000db01c1d7cea9d077e",
         "android_client_info": {
           "package_name": "com.example.livinet_mobile"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAbCdEfGhIjKlMnOpQrStUvWxYz123456789"
+          "current_key": "AIzaSyCATJTVEt8UE2UrueI8YJmJEeCPXe7AcZE"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }

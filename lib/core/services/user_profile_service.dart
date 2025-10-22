@@ -2,14 +2,20 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/user_profile.dart';
 import 'auth_service.dart';
+import '../config/app_config.dart';
+import 'app_logger.dart';
+import '../cache/cache_manager.dart';
+import '../cache/cache.dart';
 
 class UserProfileService {
-  static const String baseUrl = 'https://7c3591ea9167.ngrok-free.app/api/v1';
+  static final _config = AppConfig.instance;
+  static String get baseUrl => _config.baseUrl;
+  final _logger = AppLogger.instance;
+  final _cacheManager = CacheManager.instance;
+
+  static const String CACHE_VERSION = '1.0.0';
 
   static UserProfileService? _instance;
-  UserProfile? _cachedProfile;
-  DateTime? _lastFetch;
-  static const Duration _cacheExpiry = Duration(minutes: 5);
 
   UserProfileService._internal();
 
@@ -19,17 +25,36 @@ class UserProfileService {
   }
 
   /// Get user profile with caching
-  Future<Map<String, dynamic>> getUserProfile(String userId) async {
+  Future<Map<String, dynamic>> getUserProfile(
+    String userId, {
+    bool forceRefresh = false,
+  }) async {
     try {
-      // Check if we have a valid cached profile
-      if (_cachedProfile != null &&
-          _lastFetch != null &&
-          DateTime.now().difference(_lastFetch!) < _cacheExpiry) {
-        return {
-          'success': true,
-          'data': _cachedProfile,
-          'message': 'Profile fetched from cache',
-        };
+      final cacheKey = 'profile_$userId';
+
+      // Define cache configuration: 20 min fresh, 4 hours stale
+      final cacheConfig = CacheConfig(
+        maxAge: const Duration(minutes: 20),
+        staleAge: const Duration(hours: 4),
+        strategy: CacheStrategy.staleWhileRevalidate,
+        version: CACHE_VERSION,
+      );
+
+      // Check cache first (unless force refresh)
+      if (!forceRefresh) {
+        final cached = await _cacheManager.get<UserProfile>(
+          cacheKey,
+          cacheConfig,
+          (json) => UserProfile.fromJson(json),
+        );
+
+        if (cached != null) {
+          return {
+            'success': true,
+            'data': cached.data,
+            'message': 'Profile fetched from cache',
+          };
+        }
       }
 
       // Get auth token
@@ -59,27 +84,29 @@ class UserProfileService {
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
 
-        print('UserProfileService - Response structure: ${responseData.keys}');
-        print('UserProfileService - Full response: $responseData');
+        _logger.debug('Response structure: ${responseData.keys}');
+        _logger.debug('Full response: $responseData');
 
         if (responseData['code'] == 200 && responseData['payload'] != null) {
           final profileData = responseData['payload']['profile'];
 
-          print('UserProfileService - Profile data: $profileData');
+          _logger.debug('Profile data: $profileData');
 
           try {
-            // Cache the profile with error handling
-            _cachedProfile = UserProfile.fromJson(profileData);
-            _lastFetch = DateTime.now();
+            // Parse and cache the profile
+            final profile = UserProfile.fromJson(profileData);
+
+            // Store in cache
+            await _cacheManager.set(cacheKey, profile.toJson(), cacheConfig);
 
             return {
               'success': true,
-              'data': _cachedProfile,
+              'data': profile,
               'message':
                   responseData['message'] ?? 'Profile fetched successfully',
             };
           } catch (e) {
-            print('UserProfileService - Error parsing profile: $e');
+            _logger.error('Error parsing profile', e);
             return {
               'success': false,
               'message': 'Error parsing profile data: $e',
@@ -107,7 +134,7 @@ class UserProfileService {
         };
       }
     } catch (e) {
-      print('UserProfileService - Error: $e');
+      _logger.error('Error getting user profile', e);
       return {
         'success': false,
         'message': 'Network error: ${e.toString()}',
@@ -137,7 +164,7 @@ class UserProfileService {
         return result;
       }
     } catch (e) {
-      print('UserProfileService - Error (basic info): $e');
+      _logger.error('Error fetching basic profile info', e);
       return {
         'success': false,
         'message': 'Error fetching basic profile info: ${e.toString()}',
@@ -174,7 +201,7 @@ class UserProfileService {
       final userId = currentUser['user_id'] as String;
       return await getUserProfile(userId);
     } catch (e) {
-      print('UserProfileService - Error (current user): $e');
+      _logger.error('Error fetching current user profile', e);
       return {
         'success': false,
         'message': 'Error fetching current user profile: ${e.toString()}',
@@ -184,24 +211,20 @@ class UserProfileService {
   }
 
   /// Clear cached profile data
-  void clearCache() {
-    _cachedProfile = null;
-    _lastFetch = null;
-  }
-
-  /// Get cached profile without making API call
-  UserProfile? getCachedProfile() {
-    if (_cachedProfile != null &&
-        _lastFetch != null &&
-        DateTime.now().difference(_lastFetch!) < _cacheExpiry) {
-      return _cachedProfile;
+  Future<void> clearCache({String? userId}) async {
+    if (userId != null) {
+      final cacheKey = 'profile_$userId';
+      await _cacheManager.invalidate(cacheKey);
+      _logger.debug('Cleared profile cache for user: $userId');
+    } else {
+      // Clear all profile cache
+      await _cacheManager.invalidatePattern(r'^profile_.*');
+      _logger.debug('Cleared all profile cache');
     }
-    return null;
   }
 
   /// Force refresh profile data (bypass cache)
   Future<Map<String, dynamic>> refreshProfile(String userId) async {
-    clearCache();
-    return await getUserProfile(userId);
+    return await getUserProfile(userId, forceRefresh: true);
   }
 }

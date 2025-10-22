@@ -67,7 +67,6 @@ class _MakeTicketScreenState extends State<MakeTicketScreen> {
           }
         }
       } catch (e) {
-        print('Failed to get address: $e');
         // Continue without address - it's optional
       }
 
@@ -85,7 +84,6 @@ class _MakeTicketScreenState extends State<MakeTicketScreen> {
           }
         }
       } catch (e) {
-        print('Failed to get subscription: $e');
         // Continue without subscription - it's optional
       }
 
