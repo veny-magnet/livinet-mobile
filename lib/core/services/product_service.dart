@@ -1,7 +1,6 @@
 import 'base_api_service.dart';
 import 'app_logger.dart';
-import '../cache/cache_manager.dart';
-import '../cache/cache.dart';
+// Cache imports removed - no longer needed
 
 class Product {
   final int pid;
@@ -55,10 +54,8 @@ class Product {
 class ProductService {
   final BaseApiService _apiService = BaseApiService();
   final _logger = AppLogger.instance;
-  final _cacheManager = CacheManager.instance;
 
   static ProductService? _instance;
-  static const String CACHE_VERSION = '1.0.0';
 
   ProductService._internal();
 
@@ -67,44 +64,14 @@ class ProductService {
     return _instance!;
   }
 
-  /// Get products with caching support
+  /// Get products - NO CACHE, always fetch fresh
   Future<Map<String, dynamic>> getProducts({
     required String userId,
     int? addressId,
     bool forceRefresh = false,
   }) async {
     try {
-      final cacheKey = 'products_${userId}_${addressId ?? 'no_address'}';
-      final cacheConfig = CacheConfig(
-        maxAge: const Duration(minutes: 15),
-        staleAge: const Duration(hours: 2),
-        strategy: CacheStrategy.staleWhileRevalidate,
-        version: CACHE_VERSION,
-      );
-
-      // Try cache first (unless force refresh)
-      if (!forceRefresh) {
-        final cached = await _cacheManager.get<List<Product>>(
-          cacheKey,
-          cacheConfig,
-          (json) {
-            final productsData = json['products'] as List;
-            return productsData.map((p) => Product.fromJson(p)).toList();
-          },
-        );
-
-        if (cached != null && !cached.isExpired(cacheConfig.maxAge)) {
-          _logger.debug('Cache HIT: $cacheKey');
-          return {
-            'success': true,
-            'data': cached.data,
-            'message': 'Products from cache',
-            'fromCache': true,
-          };
-        }
-      }
-
-      _logger.debug('Cache MISS, fetching from API: $cacheKey');
+      _logger.debug('Fetching products from API');
 
       // Prepare query parameters
       final Map<String, String> queryParams = {'user_id': userId};
@@ -130,11 +97,6 @@ class ProductService {
         final products = productsData
             .map((json) => Product.fromJson(json))
             .toList();
-
-        // Update cache
-        await _cacheManager.set(cacheKey, {
-          'products': products.map((p) => p.toJson()).toList(),
-        }, cacheConfig);
 
         return {
           'success': true,
@@ -249,35 +211,7 @@ class ProductService {
     }
   }
 
-  /// Clear cached products
-  Future<void> clearCache({String? userId, int? addressId}) async {
-    if (userId != null) {
-      if (addressId != null) {
-        // Clear specific cache
-        final cacheKey = 'products_${userId}_$addressId';
-        await _cacheManager.invalidate(cacheKey);
-      } else {
-        // Clear all cache for this user
-        await _cacheManager.invalidatePattern(r'products_' + userId + r'_.*');
-      }
-    } else {
-      // Clear all product cache
-      await _cacheManager.invalidatePattern(r'products_.*');
-    }
-  }
-
-  /// Force refresh products (bypass cache)
-  Future<Map<String, dynamic>> refreshProducts({
-    required String userId,
-    int? addressId,
-  }) async {
-    await clearCache(userId: userId, addressId: addressId);
-    return await getProducts(
-      userId: userId,
-      addressId: addressId,
-      forceRefresh: true,
-    );
-  }
+  // Cache methods removed - no longer needed
 
   /// Get product ID for bill payment based on bill context
   Future<int?> getProductIdForBill({

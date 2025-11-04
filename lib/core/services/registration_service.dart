@@ -2,20 +2,26 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
+import 'app_logger.dart';
 
 class RegistrationService {
   static final _config = AppConfig.instance;
+  static final _logger = AppLogger.instance;
   static String get baseUrl => _config.baseUrl;
   static String get apiServer => _config.apiServer;
   static String get apiKey => _config.apiKey;
 
-  // Complete registration
+  // Complete registration - NO session validation needed for registration
   Future<Map<String, dynamic>> register(
     Map<String, dynamic> registrationData,
   ) async {
     try {
+      final fullUrl = '$baseUrl/client/registration';
+      _logger.info('Registration URL: $fullUrl');
+      _logger.info('Registration data: ${registrationData.keys.toList()}');
+
       final response = await http.post(
-        Uri.parse('$baseUrl/client/registration'),
+        Uri.parse(fullUrl),
         headers: {
           'Content-Type': 'application/json',
           'ngrok-skip-browser-warning': 'true',
@@ -24,15 +30,20 @@ class RegistrationService {
         body: jsonEncode(registrationData),
       );
 
+      _logger.info('Response status: ${response.statusCode}');
+      _logger.info('Response body: ${response.body}');
+
       Map<String, dynamic> responseData = jsonDecode(response.body);
 
       if (response.statusCode == 200 && responseData['success'] == true) {
+        _logger.info('Registration successful');
         return {
           'success': true,
           'data': responseData['data'],
           'message': responseData['message'],
         };
       } else {
+        _logger.error('Registration failed: ${responseData['message']}');
         return {
           'success': false,
           'message': responseData['message'] ?? 'Registration failed',
@@ -41,6 +52,7 @@ class RegistrationService {
         };
       }
     } catch (e) {
+      _logger.error('Registration network error: $e');
       return {
         'success': false,
         'message': 'Network error: ${e.toString()}',
@@ -48,13 +60,6 @@ class RegistrationService {
         'errors': null,
       };
     }
-  }
-
-  static int _userCounter = 0;
-  String generateUserId() {
-    final id = 'CR006${_userCounter.toString().padLeft(2, '0')}';
-    _userCounter++;
-    return id;
   }
 
   // Build registration data
@@ -69,13 +74,9 @@ class RegistrationService {
     required int areaId,
     required String postcode,
     String? referralCode,
-    required String ktpPath,
-    required Map<String, dynamic> identityCard,
-    String? userId,
     String? fcmToken,
   }) {
     return {
-      'user_id': userId ?? generateUserId(),
       'username': username.trim(),
       'phone': phone.trim(),
       'email': email.trim().toLowerCase(),
@@ -87,8 +88,6 @@ class RegistrationService {
       'postcode': postcode.trim(),
       'country': 'Indonesia',
       'referral_code': referralCode?.trim(),
-      'ktp_path': ktpPath,
-      'identity_card': identityCard,
       'fcm_token': fcmToken,
     };
   }
@@ -96,11 +95,6 @@ class RegistrationService {
   // Validate registration data before sending
   Map<String, String> validateRegistrationData(Map<String, dynamic> data) {
     Map<String, String> errors = {};
-
-    // User ID
-    if (data['user_id'] == null || data['user_id'].toString().trim().isEmpty) {
-      errors['user_id'] = 'User ID is required';
-    }
 
     // Username
     if (data['username'] == null ||
@@ -159,30 +153,7 @@ class RegistrationService {
       errors['postcode'] = 'Postcode is required';
     }
 
-    // Identity card data
-    if (data['identity_card'] == null) {
-      errors['identity_card'] = 'Identity card data is required';
-    } else {
-      Map<String, dynamic> identityCard = data['identity_card'];
-      List<String> requiredFields = [
-        'national_id_number',
-        'full_name',
-        'first_name',
-        'last_name',
-        'birth_place',
-        'birth_date',
-        'gender',
-        'address',
-      ];
-
-      for (String field in requiredFields) {
-        if (identityCard[field] == null ||
-            identityCard[field].toString().trim().isEmpty) {
-          errors['identity_card_$field'] =
-              '${field.replaceAll('_', ' ')} is required in identity card';
-        }
-      }
-    }
+    // Note: Identity card data validation removed - KTP will be uploaded separately after registration
 
     return errors;
   }

@@ -3,8 +3,7 @@ import 'package:http/http.dart' as http;
 import 'auth_service.dart';
 import 'app_logger.dart';
 import '../config/app_config.dart';
-import '../cache/cache_manager.dart';
-import '../cache/cache.dart';
+// Cache imports removed - no longer needed
 
 class ProductDetail {
   final String name;
@@ -55,9 +54,6 @@ class ProductDetailService {
   static final _config = AppConfig.instance;
   static String get baseUrl => _config.baseUrl;
   final _logger = AppLogger.instance;
-  final _cacheManager = CacheManager.instance;
-
-  static const String CACHE_VERSION = '1.0.0';
 
   static ProductDetailService? _instance;
 
@@ -68,39 +64,12 @@ class ProductDetailService {
     return _instance!;
   }
 
-  /// Get product detail with authentication
+  /// Get product detail with authentication - NO CACHE
   Future<Map<String, dynamic>> getProductDetail({
     required int productId,
     bool forceRefresh = false,
   }) async {
     try {
-      final cacheKey = 'product_detail_$productId';
-
-      // Define cache configuration: 15 min fresh, 2 hours stale
-      final cacheConfig = CacheConfig(
-        maxAge: const Duration(minutes: 15),
-        staleAge: const Duration(hours: 2),
-        strategy: CacheStrategy.staleWhileRevalidate,
-        version: CACHE_VERSION,
-      );
-
-      // Check cache first unless force refresh
-      if (!forceRefresh) {
-        final cached = await _cacheManager.get<ProductDetail>(
-          cacheKey,
-          cacheConfig,
-          (json) => ProductDetail.fromJson(json),
-        );
-
-        if (cached != null) {
-          return {
-            'success': true,
-            'data': cached.data,
-            'message': 'Product detail fetched from cache',
-          };
-        }
-      }
-
       // Get auth token
       final authService = AuthService();
       final token = await authService.getAuthToken();
@@ -136,15 +105,8 @@ class ProductDetailService {
           final Map<String, dynamic> productData =
               responseData['data']['product'] ?? {};
 
-          // Parse and cache the product detail
+          // Parse the product detail - NO CACHE
           final productDetail = ProductDetail.fromJson(productData);
-
-          // Store in cache
-          await _cacheManager.set(
-            cacheKey,
-            productDetail.toJson(),
-            cacheConfig,
-          );
 
           return {
             'success': true,
@@ -184,22 +146,5 @@ class ProductDetailService {
     }
   }
 
-  /// Clear cached product details
-  Future<void> clearCache({int? productId}) async {
-    if (productId != null) {
-      final cacheKey = 'product_detail_$productId';
-      await _cacheManager.invalidate(cacheKey);
-      _logger.debug('Cleared product detail cache for: $productId');
-    } else {
-      await _cacheManager.invalidatePattern(r'^product_detail_.*');
-      _logger.debug('Cleared all product detail cache');
-    }
-  }
-
-  /// Force refresh product detail (bypass cache)
-  Future<Map<String, dynamic>> refreshProductDetail({
-    required int productId,
-  }) async {
-    return await getProductDetail(productId: productId, forceRefresh: true);
-  }
+  // Cache methods removed - no longer needed
 }

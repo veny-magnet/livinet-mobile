@@ -56,15 +56,12 @@ class _SignupScreenState extends State<SignupScreen> {
 
   // KTP data
   File? _ktpImage;
-  String? _ktpPath;
-  Map<String, dynamic>? _ocrData;
-  String? _userId;
 
   // UI states
   bool _isRegistering = false;
   String _loadingMessage = '';
 
-  /// Main signup method - validates form, then processes KTP, then registers
+  /// Main signup method - validates form, gets FCM token, registers, then uploads KTP
   Future<void> _onSignup(BuildContext context) async {
     if (_isRegistering) return;
 
@@ -73,7 +70,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
     setState(() {
       _isRegistering = true;
-      _loadingMessage = 'Processing registration...';
+      _loadingMessage = 'Processing registration';
     });
 
     try {
@@ -83,38 +80,24 @@ class _SignupScreenState extends State<SignupScreen> {
         return;
       }
 
-      // Step 3: Process KTP
-      setState(() => _loadingMessage = 'Registration Process');
+      // Step 3: Get FCM token (REQUIRED for registration)
+      setState(() => _loadingMessage = 'Setting up notifications');
 
-      // Generate user ID if not exists
-      _userId ??= _registrationService.generateUserId();
-
-      final ktpResult = await _ktpService.uploadAndProcessKtp(
-        userId: _userId!,
-        imageFile: _ktpImage!,
-      );
-
-      if (!ktpResult['success']) {
-        _showError(ktpResult['message'] ?? 'Failed to process KTP');
-        return;
-      }
-
-      // Save KTP data
-      _ktpPath = ktpResult['data']['ktp_path'];
-      _ocrData = ktpResult['data']['identity_card'];
-
-      // Step 4: Proceed with registration
-      setState(() => _loadingMessage = 'Creating your account...');
-
-      // Get FCM token for push notifications
-      String? fcmToken;
+      String fcmToken;
       try {
         fcmToken = await FcmService.getTokenForRegistration();
       } catch (e) {
-        // Continue without FCM token - it's optional
+        setState(() => _loadingMessage = '');
+        _showError(
+          'Notification Setup Required: We need notification permissions to complete your registration. Please allow notifications and try again.\n\nError: ${e.toString()}',
+        );
+        return;
       }
 
-      // Build registration data
+      // Step 4: Register user first
+      setState(() => _loadingMessage = 'Creating your account');
+
+      // Build registration data (without KTP for now)
       final registrationData = _registrationService.buildRegistrationData(
         username: _usernameController.text,
         phone: _phoneController.text,
@@ -126,9 +109,6 @@ class _SignupScreenState extends State<SignupScreen> {
         areaId: _selectedArea!.id,
         postcode: _postcodeController.text,
         referralCode: _referralCodeController.text,
-        ktpPath: _ktpPath!,
-        identityCard: _ocrData!,
-        userId: _userId,
         fcmToken: fcmToken,
       );
 
@@ -144,32 +124,33 @@ class _SignupScreenState extends State<SignupScreen> {
       // Register user
       final result = await _registrationService.register(registrationData);
 
-      if (result['success']) {
-        setState(() => _loadingMessage = 'Sending verification email...');
-        // Send email verification
-        await _authService.sendEmailVerification(
-          userId: registrationData['user_id'],
-        );
-        // Show dialog for email verification
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            title: const Text('Registration Successful'),
-            content: const Text('Check your email for verification account'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  context.go('/login');
-                },
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
-      } else {
+      if (!result['success']) {
         _showError(result['message'] ?? 'Registration failed');
+        return;
+      }
+
+      // Step 5: Auto upload KTP immediately after successful registration
+      // Stay in loading screen - no UI change
+      setState(() => _loadingMessage = 'Register Account');
+
+      final userId = result['data']['user_code'];
+      final ktpResult = await _ktpService.uploadAndProcessKtp(
+        userId: userId,
+        imageFile: _ktpImage!,
+      );
+
+      if (!ktpResult['success']) {
+        _showError(ktpResult['message'] ?? 'Failed to process identity card');
+        return;
+      }
+
+      // Step 6: Send email verification
+      setState(() => _loadingMessage = 'Finalizing registration');
+      await _authService.sendEmailVerification(userId: userId);
+
+      // Show email verification dialog
+      if (mounted) {
+        _showEmailVerificationDialog();
       }
     } catch (e) {
       _showError('Error: $e');
@@ -181,6 +162,7 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
+  /// Validate basic form fields (without KTP)
   /// Validate basic form fields (without KTP)
   bool _validateBasicForm() {
     if (_referralCodeController.text.isNotEmpty &&
@@ -319,8 +301,6 @@ class _SignupScreenState extends State<SignupScreen> {
           _areasCache[city.id] = areas;
           _currentAreas = areas;
         });
-
-        for (var area in areas) {}
       } catch (e) {
         _showError('Failed to load areas for ${city.name}');
       }
@@ -334,6 +314,113 @@ class _SignupScreenState extends State<SignupScreen> {
         backgroundColor: Colors.red,
         duration: const Duration(seconds: 4),
       ),
+    );
+  }
+
+  void _showEmailVerificationDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return WillPopScope(
+          onWillPop: () async => false,
+          child: Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4CB04C).withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.email_outlined,
+                      size: 40,
+                      color: Color(0xFF4CB04C),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Registration Successful!',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Open Sans',
+                      color: Colors.black87,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Please check your email to verify your account.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'Open Sans',
+                      color: Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'A verification link has been sent to:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'Open Sans',
+                      color: Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _emailController.text,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'Open Sans',
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF4CB04C),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop(); // Close dialog
+                        context.go('/login'); // Navigate to login
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4CB04C),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Go to Login',
+                        style: TextStyle(
+                          fontFamily: 'Open Sans',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -400,12 +487,6 @@ class _SignupScreenState extends State<SignupScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          TextInput(
-                            icon: Icons.card_giftcard,
-                            hintText: "Referral Code (Optional)",
-                            controller: _referralCodeController,
-                          ),
-                          const SizedBox(height: 16),
                           TextInput(
                             icon: Icons.person_outline,
                             hintText: "Username",
@@ -544,6 +625,13 @@ class _SignupScreenState extends State<SignupScreen> {
                               });
                             },
                           ),
+                          const SizedBox(height: 16),
+
+                          TextInput(
+                            icon: Icons.card_giftcard,
+                            hintText: "Referral Code (Optional)",
+                            controller: _referralCodeController,
+                          ),
                           const SizedBox(height: 10),
 
                           Row(
@@ -601,7 +689,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           const SizedBox(height: 16),
 
                           AppButton(
-                            text: _isRegistering ? "Processing..." : "Sign Up",
+                            text: _isRegistering ? "Processing" : "Sign Up",
                             onPressed: _isRegistering
                                 ? null
                                 : () => _onSignup(context),

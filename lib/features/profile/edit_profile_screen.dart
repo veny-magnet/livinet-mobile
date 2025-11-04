@@ -141,6 +141,46 @@ class _EditProfileScreenState extends State<EditProfileScreen>
   }
 
   Future<void> _updateProfile() async {
+    // Show loading dialog
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return WillPopScope(
+            onWillPop: () async => false,
+            child: const Center(
+              child: Card(
+                margin: EdgeInsets.symmetric(horizontal: 40),
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(0xFF4CB04C),
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'Updating profile...',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontFamily: 'Open Sans',
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    }
+
     try {
       // Get user ID
       final authService = AuthService();
@@ -148,6 +188,7 @@ class _EditProfileScreenState extends State<EditProfileScreen>
 
       if (currentUser == null || currentUser['user_id'] == null) {
         if (mounted) {
+          Navigator.of(context).pop(); // Close loading dialog
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('User session not found. Please login again.'),
@@ -167,6 +208,7 @@ class _EditProfileScreenState extends State<EditProfileScreen>
 
       if (profileResult['success'] != true) {
         if (mounted) {
+          Navigator.of(context).pop(); // Close loading dialog
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Failed to load profile data'),
@@ -179,6 +221,8 @@ class _EditProfileScreenState extends State<EditProfileScreen>
 
       final originalProfile = profileResult['data'];
       bool hasChanges = false;
+      bool emailUpdated = false;
+      bool phoneUpdated = false;
 
       // Check if email changed
       if (_emailController.text != originalProfile.email) {
@@ -189,8 +233,10 @@ class _EditProfileScreenState extends State<EditProfileScreen>
 
         if (result['success'] == true) {
           hasChanges = true;
+          emailUpdated = true;
         } else {
           if (mounted) {
+            Navigator.of(context).pop(); // Close loading dialog
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(result['message'] ?? 'Failed to update email'),
@@ -212,8 +258,10 @@ class _EditProfileScreenState extends State<EditProfileScreen>
 
         if (result['success'] == true) {
           hasChanges = true;
+          phoneUpdated = true;
         } else {
           if (mounted) {
+            Navigator.of(context).pop(); // Close loading dialog
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(result['message'] ?? 'Failed to update phone'),
@@ -226,22 +274,29 @@ class _EditProfileScreenState extends State<EditProfileScreen>
       }
 
       if (hasChanges) {
-        // Clear cache and reload profile
-        UserProfileService.instance.clearCache();
+        // Reload profile (cache clearing no longer needed)
         await _loadUserProfile();
 
         if (mounted) {
-          DialogHelper.showSuccess(
-            context,
-            title: 'Success',
-            message: 'Profile updated successfully!',
-            onConfirm: () {
-              Navigator.of(context).pop();
-            },
-          );
+          Navigator.of(context).pop(); // Close loading dialog
+
+          // Show different dialog based on what was updated
+          if (emailUpdated) {
+            _showEmailVerificationDialog();
+          } else if (phoneUpdated) {
+            DialogHelper.showSuccess(
+              context,
+              title: 'Success',
+              message: 'Phone updated successfully!',
+              onConfirm: () {
+                Navigator.of(context).pop();
+              },
+            );
+          }
         }
       } else {
         if (mounted) {
+          Navigator.of(context).pop(); // Close loading dialog
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('No changes detected'),
@@ -252,6 +307,7 @@ class _EditProfileScreenState extends State<EditProfileScreen>
       }
     } catch (e) {
       if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: ${e.toString()}'),
@@ -260,6 +316,115 @@ class _EditProfileScreenState extends State<EditProfileScreen>
         );
       }
     }
+  }
+
+  void _showEmailVerificationDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return WillPopScope(
+          onWillPop: () async => false,
+          child: Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4CB04C).withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.email_outlined,
+                      size: 40,
+                      color: Color(0xFF4CB04C),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Email Updated Successfully!',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Open Sans',
+                      color: Colors.black87,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Please check your email to verify your new email address.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'Open Sans',
+                      color: Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'A verification link has been sent to:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'Open Sans',
+                      color: Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _emailController.text,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'Open Sans',
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF4CB04C),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop(); // Close dialog
+                        Navigator.of(
+                          context,
+                        ).pop(); // Close edit profile screen
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4CB04C),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Got it',
+                        style: TextStyle(
+                          fontFamily: 'Open Sans',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override

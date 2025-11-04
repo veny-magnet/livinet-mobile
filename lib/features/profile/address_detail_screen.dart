@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/services/address_service.dart';
-import '../../core/services/product_service.dart';
+// ProductService import removed - no longer needed
 import '../../core/widgets/confirmation_dialog.dart';
 
 class AddressDetailScreen extends StatefulWidget {
@@ -110,8 +110,7 @@ class _AddressDetailScreenState extends State<AddressDetailScreen> {
       if (mounted) Navigator.of(context).pop();
 
       if (result['success'] == true) {
-        // Clear product cache for this user when address is updated
-        ProductService.instance.clearCache(userId: widget.address.userId);
+        // Cache clearing removed - no longer needed
 
         DialogHelper.showSuccess(
           context,

@@ -27,14 +27,9 @@ class _FAQSectionState extends State<FAQSection> {
         errorMessage = null;
       });
     } else {
-      // Check cache asynchronously
-      final cacheInfo = await FAQService.getCacheInfo();
-      if (cacheInfo['hasCachedData'] == false) {
-        setState(() {
-          isLoading = true;
-          errorMessage = null;
-        });
-      }
+      setState(() {
+        isLoading = true;
+      });
     }
 
     try {

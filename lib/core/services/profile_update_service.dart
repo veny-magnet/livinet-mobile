@@ -40,11 +40,15 @@ class ProfileUpdateService {
         };
       }
 
+      // Format phone numbers to database format (+62.xxx-xxxx-xxxx)
+      final formattedOldPhone = formatPhoneForDatabase(oldPhone);
+      final formattedNewPhone = formatPhoneForDatabase(newPhone);
+
       // Prepare request body
       final Map<String, dynamic> requestBody = {
         'user_id': userId,
-        'oldphone': oldPhone,
-        'phone': newPhone,
+        'oldphone': formattedOldPhone,
+        'phone': formattedNewPhone,
       };
 
       _logger.debug('Phone update request to: $baseUrl/update/phoneupdate');
@@ -337,20 +341,47 @@ class ProfileUpdateService {
     return emailRegex.hasMatch(email);
   }
 
-  /// Format phone number for display
-  String formatPhoneForDisplay(String phone) {
+  /// Format phone number for database (e.g., +62.876-4331-9477)
+  String formatPhoneForDatabase(String phone) {
+    // Remove all non-digit characters
     final cleanPhone = phone.replaceAll(RegExp(r'[^\d]'), '');
 
+    String phoneWithCountryCode;
+
+    // Add country code if not present
     if (cleanPhone.startsWith('0')) {
-      return '+62${cleanPhone.substring(1)}';
+      phoneWithCountryCode = '62${cleanPhone.substring(1)}';
     } else if (cleanPhone.startsWith('62')) {
-      return '+$cleanPhone';
+      phoneWithCountryCode = cleanPhone;
     } else {
-      return '+62$cleanPhone';
+      phoneWithCountryCode = '62$cleanPhone';
     }
+
+    // Format: +62.xxx-xxxx-xxxx
+    if (phoneWithCountryCode.length >= 11) {
+      final countryCode = phoneWithCountryCode.substring(0, 2); // 62
+      final part1 = phoneWithCountryCode.substring(2, 5); // 3 digits
+      final part2 = phoneWithCountryCode.substring(5, 9); // 4 digits
+      final part3 = phoneWithCountryCode.substring(9); // remaining digits
+
+      return '+$countryCode.$part1-$part2-$part3';
+    }
+
+    // If format doesn't match expected length, return with + prefix
+    return '+$phoneWithCountryCode';
   }
 
-  /// Clean phone number for API request
+  /// Format phone number for display
+  String formatPhoneForDisplay(String phone) {
+    // If already formatted, return as is
+    if (phone.contains('.') || phone.contains('-')) {
+      return phone;
+    }
+
+    return formatPhoneForDatabase(phone);
+  }
+
+  /// Clean phone number for API request (remove all formatting)
   String cleanPhoneNumber(String phone) {
     return phone.replaceAll(RegExp(r'[^\d]'), '');
   }

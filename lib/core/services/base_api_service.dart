@@ -44,7 +44,7 @@ class BaseApiService {
         headers['Authorization'] = 'Bearer $token';
       }
     } catch (e) {
-      print('Error getting auth token: $e');
+      _logger.error('Error getting auth token', e);
     }
 
     if (additionalHeaders != null) {
@@ -144,16 +144,16 @@ class BaseApiService {
     http.Response response,
     T Function(dynamic)? fromJson,
   ) {
-    print('BaseApiService: Response status: ${response.statusCode}');
-    print('BaseApiService: Response body: ${response.body}');
+    _logger.info('BaseApiService: Response status: ${response.statusCode}');
+    _logger.debug('BaseApiService: Response body: ${response.body}');
 
     final Map<String, dynamic> jsonResponse;
 
     try {
       jsonResponse = jsonDecode(response.body) as Map<String, dynamic>;
     } catch (e) {
-      print('BaseApiService: Failed to parse JSON: $e');
-      print('BaseApiService: Raw response body: ${response.body}');
+      _logger.error('BaseApiService: Failed to parse JSON', e);
+      _logger.info('BaseApiService: Raw response body: ${response.body}');
       throw ApiException('Invalid JSON response', response.statusCode);
     }
 
@@ -161,7 +161,7 @@ class BaseApiService {
       return ApiResponse.fromJson(jsonResponse, fromJson);
     } else {
       final message = jsonResponse['message'] as String? ?? 'Unknown error';
-      print(
+      _logger.error(
         'BaseApiService: Error response - Status: ${response.statusCode}, Message: $message',
       );
 
@@ -172,8 +172,8 @@ class BaseApiService {
         final line = jsonResponse['line'] as int?;
 
         if (exception != null) {
-          print('BaseApiService: Server Exception: $exception');
-          print('BaseApiService: File: $file:$line');
+          _logger.error('BaseApiService: Server Exception: $exception');
+          _logger.info('BaseApiService: File: $file:$line');
         }
 
         throw ApiException('System Error. $message', response.statusCode);

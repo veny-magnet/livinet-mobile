@@ -1,19 +1,14 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import '../models/user_profile.dart';
 import 'auth_service.dart';
 import '../config/app_config.dart';
 import 'app_logger.dart';
-import '../cache/cache_manager.dart';
-import '../cache/cache.dart';
+import 'api_interceptor.dart';
 
 class UserProfileService {
   static final _config = AppConfig.instance;
   static String get baseUrl => _config.baseUrl;
   final _logger = AppLogger.instance;
-  final _cacheManager = CacheManager.instance;
-
-  static const String CACHE_VERSION = '1.0.0';
 
   static UserProfileService? _instance;
 
@@ -24,61 +19,18 @@ class UserProfileService {
     return _instance!;
   }
 
-  /// Get user profile with caching
+  /// Get user profile - always fetch fresh from API
   Future<Map<String, dynamic>> getUserProfile(
     String userId, {
     bool forceRefresh = false,
   }) async {
     try {
-      final cacheKey = 'profile_$userId';
-
-      // Define cache configuration: 20 min fresh, 4 hours stale
-      final cacheConfig = CacheConfig(
-        maxAge: const Duration(minutes: 20),
-        staleAge: const Duration(hours: 4),
-        strategy: CacheStrategy.staleWhileRevalidate,
-        version: CACHE_VERSION,
-      );
-
-      // Check cache first (unless force refresh)
-      if (!forceRefresh) {
-        final cached = await _cacheManager.get<UserProfile>(
-          cacheKey,
-          cacheConfig,
-          (json) => UserProfile.fromJson(json),
-        );
-
-        if (cached != null) {
-          return {
-            'success': true,
-            'data': cached.data,
-            'message': 'Profile fetched from cache',
-          };
-        }
-      }
-
-      // Get auth token
-      final authService = AuthService();
-      final token = await authService.getAuthToken();
-
-      if (token == null) {
-        return {
-          'success': false,
-          'message': 'Authentication token not found. Please login again.',
-          'data': null,
-        };
-      }
-
-      final response = await http.get(
+      // Make API request with session validation - NO CACHE
+      final response = await ApiInterceptor.get(
         Uri.parse(
           '$baseUrl/get/profile',
         ).replace(queryParameters: {'user_id': userId}),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-          'ngrok-skip-browser-warning': 'true',
-          'Accept': 'application/json',
-        },
+        requireAuth: true,
       );
 
       if (response.statusCode == 200) {
@@ -93,11 +45,8 @@ class UserProfileService {
           _logger.debug('Profile data: $profileData');
 
           try {
-            // Parse and cache the profile
+            // Parse the profile - NO CACHE
             final profile = UserProfile.fromJson(profileData);
-
-            // Store in cache
-            await _cacheManager.set(cacheKey, profile.toJson(), cacheConfig);
 
             return {
               'success': true,
@@ -210,21 +159,5 @@ class UserProfileService {
     }
   }
 
-  /// Clear cached profile data
-  Future<void> clearCache({String? userId}) async {
-    if (userId != null) {
-      final cacheKey = 'profile_$userId';
-      await _cacheManager.invalidate(cacheKey);
-      _logger.debug('Cleared profile cache for user: $userId');
-    } else {
-      // Clear all profile cache
-      await _cacheManager.invalidatePattern(r'^profile_.*');
-      _logger.debug('Cleared all profile cache');
-    }
-  }
-
-  /// Force refresh profile data (bypass cache)
-  Future<Map<String, dynamic>> refreshProfile(String userId) async {
-    return await getUserProfile(userId, forceRefresh: true);
-  }
+  // Cache methods removed - no longer needed without cache system
 }

@@ -4,7 +4,7 @@ import '../services/order_service.dart';
 import '../services/product_service.dart';
 import '../services/address_service.dart';
 import '../services/auth_service.dart';
-import '../services/bill_service.dart';
+// BillService removed - no longer needed for cache clearing
 import '../../features/home/home_screen.dart';
 
 class OrderDialog extends StatefulWidget {
@@ -46,7 +46,6 @@ class _OrderDialogState extends State<OrderDialog> {
         throw Exception('User not authenticated');
       }
     } catch (e) {
-      print('Error loading user data: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please login first'),
@@ -70,9 +69,7 @@ class _OrderDialogState extends State<OrderDialog> {
           }
         });
       }
-    } catch (e) {
-      print('Error loading addresses: $e');
-    }
+    } catch (e) {}
   }
 
   Future<void> _submitOrder() async {
@@ -363,21 +360,7 @@ class _OrderDialogState extends State<OrderDialog> {
   }
 
   void _navigateToHome() {
-    // Clear ALL cached data for complete refresh after successful order
-    if (_userId != null) {
-      // Clear specific user cache
-      BillService.instance.clearCache(userId: _userId!);
-      ProductService.instance.clearCache(userId: _userId!);
-
-      // Clear all subscription cache to get latest subscription data
-      // Since SubscriptionService doesn't have userId-specific clearing, we clear all
-      print('Clearing all caches after successful order for user: $_userId');
-    } else {
-      // Clear all cache if userId not available
-      BillService.instance.clearCache();
-      ProductService.instance.clearCache();
-      print('Clearing all caches after successful order (no userId)');
-    }
+    // Cache clearing removed - no longer needed without cache system
 
     // Navigate to home
     Navigator.of(context).pushAndRemoveUntil(

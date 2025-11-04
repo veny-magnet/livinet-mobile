@@ -9,21 +9,41 @@ class FcmService {
 
   /// Initialize FCM and request permission
   static Future<void> initialize() async {
-    // Request permission for notifications
-    await _firebaseMessaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      provisional: false,
-    );
+    try {
+      // Request permission for notifications with proper settings
+      NotificationSettings settings = await _firebaseMessaging
+          .requestPermission(
+            alert: true,
+            badge: true,
+            sound: true,
+            provisional: false,
+            criticalAlert: false,
+            carPlay: false,
+            announcement: false,
+          );
 
-    // Get initial FCM token
-    await getFcmToken();
+      _logger.info('FCM Permission status: ${settings.authorizationStatus}');
 
-    // Listen for token refresh
-    _firebaseMessaging.onTokenRefresh.listen((token) {
-      _saveFcmToken(token);
-    });
+      if (settings.authorizationStatus == AuthorizationStatus.denied) {
+        _logger.warning('FCM notifications are denied by user');
+      } else if (settings.authorizationStatus ==
+          AuthorizationStatus.authorized) {
+        _logger.info('FCM notifications are authorized');
+      } else if (settings.authorizationStatus ==
+          AuthorizationStatus.provisional) {
+        _logger.info('FCM notifications are provisionally authorized');
+      }
+
+      // Get initial FCM token
+      await getFcmToken();
+
+      // Listen for token refresh
+      _firebaseMessaging.onTokenRefresh.listen((token) {
+        _saveFcmToken(token);
+      });
+    } catch (e) {
+      _logger.error('Error initializing FCM', e);
+    }
   }
 
   /// Get FCM token from device
@@ -64,18 +84,63 @@ class FcmService {
     }
   }
 
-  /// Get device FCM token for registration/login
+  /// Get device FCM token for registration/login with permission check
   static Future<String> getTokenForRegistration() async {
-    // Try to get fresh token
-    String? token = await getFcmToken();
+    try {
+      // Check current permission status first
+      NotificationSettings settings = await _firebaseMessaging
+          .getNotificationSettings();
 
-    // If failed, try to get saved token
-    if (token == null) {
-      token = await getSavedFcmToken();
+      if (settings.authorizationStatus == AuthorizationStatus.denied ||
+          settings.authorizationStatus == AuthorizationStatus.notDetermined) {
+        // Re-request permission if denied or not determined
+        await initialize();
+
+        // Check again after re-initialization
+        settings = await _firebaseMessaging.getNotificationSettings();
+
+        if (settings.authorizationStatus == AuthorizationStatus.denied) {
+          throw Exception(
+            'Notification permission is required for registration. Please go to app settings and enable notifications.',
+          );
+        }
+      }
+
+      // Try multiple times to get token with delay
+      for (int attempt = 1; attempt <= 5; attempt++) {
+        _logger.debug('Attempting to get FCM token, attempt $attempt/5');
+
+        String? token = await _firebaseMessaging.getToken();
+
+        if (token != null && token.isNotEmpty) {
+          await _saveFcmToken(token);
+          _logger.info(
+            'FCM Token obtained successfully: ${token.substring(0, 20)}...',
+          );
+          return token;
+        }
+
+        // Wait before retry, increasing delay each time
+        if (attempt < 5) {
+          await Future.delayed(Duration(seconds: attempt * 2));
+        }
+      }
+
+      // Try to get saved token as fallback
+      String? savedToken = await getSavedFcmToken();
+      if (savedToken != null && savedToken.isNotEmpty) {
+        _logger.warning('Using saved FCM token as fallback');
+        return savedToken;
+      }
+
+      // If all fails, throw error - FCM token is required for registration
+      throw Exception(
+        'Failed to obtain FCM token after multiple attempts. Please check your internet connection and try again.',
+      );
+    } catch (e) {
+      _logger.error('Critical error getting FCM token for registration', e);
+      throw Exception('Unable to get notification token: ${e.toString()}');
     }
-
-    // If still no token, return default/fallback
-    return token ?? 'no-fcm-token-available';
   }
 
   /// Handle foreground messages
@@ -118,6 +183,31 @@ class FcmService {
       _logger.info('Unsubscribed from FCM topic: $topic');
     } catch (e) {
       _logger.error('Error unsubscribing from topic', e);
+    }
+  }
+
+  /// Check if notification permission is granted
+  static Future<bool> isNotificationPermissionGranted() async {
+    try {
+      NotificationSettings settings = await _firebaseMessaging
+          .getNotificationSettings();
+      return settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional;
+    } catch (e) {
+      _logger.error('Error checking notification permission', e);
+      return false;
+    }
+  }
+
+  /// Get notification permission status
+  static Future<AuthorizationStatus> getNotificationPermissionStatus() async {
+    try {
+      NotificationSettings settings = await _firebaseMessaging
+          .getNotificationSettings();
+      return settings.authorizationStatus;
+    } catch (e) {
+      _logger.error('Error getting notification permission status', e);
+      return AuthorizationStatus.denied;
     }
   }
 }

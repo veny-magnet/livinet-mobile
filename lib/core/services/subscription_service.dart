@@ -1,7 +1,5 @@
 import '../services/base_api_service.dart';
 import '../models/bill_models.dart';
-import '../cache/cache_manager.dart';
-import '../cache/cache.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
@@ -19,49 +17,21 @@ class SubscriptionService {
   final AuthService _authService = AuthService();
   final _config = AppConfig.instance;
   final _logger = AppLogger.instance;
-  final _cacheManager = CacheManager.instance;
 
-  static const String CACHE_VERSION = '1.0.0';
-
+  /// Get user subscriptions - NO CACHE, always fresh from server
   Future<Map<String, dynamic>> getUserSubscriptions(
     String userId, {
-    bool forceRefresh = false,
+    bool forceRefresh = false, // Keep for backward compatibility
   }) async {
     try {
       // Get selected address from AddressManager
       final selectedAddressId = AddressManager.instance.selectedAddressId;
 
-      final cacheKey =
-          'subscriptions_${userId}_${selectedAddressId ?? 'no_address'}';
-      final cacheConfig = CacheConfig(
-        maxAge: const Duration(minutes: 30),
-        staleAge: const Duration(hours: 6),
-        strategy: CacheStrategy.staleWhileRevalidate,
-        version: CACHE_VERSION,
-      );
-
-      if (!forceRefresh) {
-        final cached = await _cacheManager.get<Map<String, dynamic>>(
-          cacheKey,
-          cacheConfig,
-          (json) => json,
-        );
-
-        if (cached != null && !cached.isExpired(cacheConfig.maxAge)) {
-          _logger.debug('Cache HIT: $cacheKey');
-          return {
-            'success': true,
-            'message': 'Subscriptions from cache',
-            'data': cached.data,
-            'fromCache': true,
-          };
-        }
-      }
-
       _logger.debug(
-        'Cache MISS, fetching subscriptions for userId: $userId, addressId: $selectedAddressId',
+        'Fetching subscriptions for userId: $userId, addressId: $selectedAddressId',
       );
 
+      // Make API request - NO CACHE, always fresh
       final response = await _apiService.get<Map<String, dynamic>>(
         '/get/subscriptions',
         queryParams: {
@@ -77,9 +47,6 @@ class SubscriptionService {
       );
 
       if (response.success && response.data != null) {
-        // Update cache
-        await _cacheManager.set(cacheKey, response.data!, cacheConfig);
-
         return {
           'success': true,
           'message': response.message,
@@ -127,40 +94,19 @@ class SubscriptionService {
     }
   }
 
+  /// Get active subscription - NO CACHE, always fresh from server
   Future<Map<String, dynamic>> getActiveSubscription(
     String userId, {
-    bool forceRefresh = false,
+    bool forceRefresh = false, // Keep for backward compatibility
   }) async {
     try {
       final selectedAddressId = AddressManager.instance.selectedAddressId;
 
-      final cacheKey =
-          'active_subscription_${userId}_${selectedAddressId ?? 'no_address'}';
-      final cacheConfig = CacheConfig(
-        maxAge: const Duration(minutes: 30),
-        staleAge: const Duration(hours: 6),
-        strategy: CacheStrategy.staleWhileRevalidate,
-        version: CACHE_VERSION,
-      );
-
-      // Try cache first (unless force refresh)
-      if (!forceRefresh) {
-        final cached = await _cacheManager.get<Map<String, dynamic>>(
-          cacheKey,
-          cacheConfig,
-          (json) => json,
-        );
-
-        if (cached != null && !cached.isExpired(cacheConfig.maxAge)) {
-          _logger.debug('Cache HIT: $cacheKey');
-          return {'success': true, 'data': cached.data, 'fromCache': true};
-        }
-      }
-
       _logger.debug(
-        'Cache MISS, getting active subscription for userId: $userId, addressId: $selectedAddressId',
+        'Getting active subscription for userId: $userId, addressId: $selectedAddressId',
       );
 
+      // Make API request - NO CACHE, always fresh
       final response = await _apiService.get<Map<String, dynamic>>(
         '/get/subscriptions',
         queryParams: {
@@ -189,9 +135,6 @@ class SubscriptionService {
             _logger.debug(
               'Found subscription with status: ${validSubscription['status']}',
             );
-
-            // Update cache
-            await _cacheManager.set(cacheKey, validSubscription, cacheConfig);
 
             return {
               'success': true,
@@ -311,31 +254,13 @@ class SubscriptionService {
     }
   }
 
-  /// Clear subscription cache
-  Future<void> clearCache({String? userId}) async {
-    if (userId != null) {
-      await _cacheManager.invalidatePattern(
-        r'subscriptions_' + userId + r'_.*',
-      );
-      await _cacheManager.invalidatePattern(
-        r'active_subscription_' + userId + r'_.*',
-      );
-    } else {
-      await _cacheManager.invalidatePattern(r'subscriptions_.*');
-      await _cacheManager.invalidatePattern(r'active_subscription_.*');
-    }
-    _logger.debug('Subscription cache cleared for user: ${userId ?? "all"}');
-  }
-
-  /// Force refresh subscriptions (bypass cache)
+  /// Refresh subscriptions (no-op since we removed cache)
   Future<Map<String, dynamic>> refreshSubscriptions(String userId) async {
-    await clearCache(userId: userId);
     return await getUserSubscriptions(userId, forceRefresh: true);
   }
 
-  /// Force refresh active subscription (bypass cache)
+  /// Refresh active subscription (no-op since we removed cache)
   Future<Map<String, dynamic>> refreshActiveSubscription(String userId) async {
-    await clearCache(userId: userId);
     return await getActiveSubscription(userId, forceRefresh: true);
   }
 }

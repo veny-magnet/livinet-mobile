@@ -7,6 +7,8 @@ import '../home/home_screen.dart';
 
 // Wrapper class to handle both OrderResponse and OrderDetail
 class PaymentData {
+  final int? orderId;
+  final String? invoiceStatus;
   final String subtotal;
   final String tax;
   final String taxRate;
@@ -25,6 +27,8 @@ class PaymentData {
   final String? recurringServiceDescription;
 
   PaymentData({
+    this.orderId,
+    this.invoiceStatus,
     required this.subtotal,
     required this.tax,
     required this.taxRate,
@@ -64,6 +68,8 @@ class PaymentData {
   // Create from OrderDetail
   factory PaymentData.fromOrderDetail(order_detail.OrderDetail order) {
     return PaymentData(
+      orderId: order.id,
+      invoiceStatus: order.invoiceStatus,
       subtotal: order.subtotal,
       tax: order.tax,
       taxRate: order.taxRate,
@@ -116,6 +122,20 @@ class _PaymentScreenState extends State<PaymentScreen> {
   double get _credit => double.tryParse(widget.orderData.credit) ?? 0;
   double get _total => double.tryParse(widget.orderData.total) ?? 0;
 
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  void _navigateToHome() {
+    if (!mounted) return;
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const HomeScreen()),
+      (route) => false,
+    );
+  }
+
   void _showMidtransPayment() {
     showDialog(
       context: context,
@@ -133,324 +153,323 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   void _handlePaymentResult(Map<String, dynamic> result) {
     final status = result['status'] ?? 'unknown';
-    print('Payment result received: $status');
 
     if (status == 'success') {
-      // Payment successful
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Payment successful!'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-        ),
+      // Payment successful - show dialog
+      _showPaymentDialog(
+        title: 'Payment Successful',
+        message: 'Your payment has been submitted successfully.',
+        isSuccess: true,
       );
-
-      // Navigate to home after showing message
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
-            (route) => false,
-          );
-        }
-      });
     } else if (status == 'pending') {
       // Payment pending
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Payment pending. Please complete your payment.'),
-          backgroundColor: Colors.orange,
-          duration: Duration(seconds: 3),
-        ),
+      _showPaymentDialog(
+        title: 'Payment Pending',
+        message: 'Payment pending. Please complete your payment.',
+        isSuccess: false,
       );
-
-      // Navigate to home after showing message
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
-            (route) => false,
-          );
-        }
-      });
     } else if (status == 'error') {
       // Payment error
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Payment failed: ${result['message'] ?? 'Unknown error'}',
-          ),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
-        ),
+      _showPaymentDialog(
+        title: 'Payment Failed',
+        message: result['message'] ?? 'Payment failed. Please try again.',
+        isSuccess: false,
       );
     } else if (status == 'closed') {
-      // Payment closed/cancelled - hanya tampilkan snackbar, tidak navigate
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Payment cancelled'),
-          backgroundColor: Colors.grey,
-          duration: Duration(seconds: 2),
-        ),
-      );
-      // User tetap di PaymentScreen, bisa mencoba lagi
+      return;
     }
+  }
+
+  void _showPaymentDialog({
+    required String title,
+    required String message,
+    required bool isSuccess,
+  }) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop(); // Close dialog
+              _navigateToHome();
+            },
+            child: const Text('Back to Home'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leadingWidth: 40,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Payment',
-            style: TextStyle(
-              color: Colors.black,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              fontFamily: 'Open Sans',
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: const Color(0xFFF8F9FA),
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            leadingWidth: 40,
+            leading: IconButton(
+              icon: const Icon(
+                Icons.arrow_back_ios,
+                color: Colors.black,
+                size: 20,
+              ),
+              onPressed: () => Navigator.pop(context),
             ),
+            title: const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Payment',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Open Sans',
+                ),
+              ),
+            ),
+            titleSpacing: 0,
           ),
-        ),
-        titleSpacing: 0,
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Bill Number
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      'No. Tagihan ${widget.orderData.midtransOrderId}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.green.shade600,
-                        fontFamily: 'Open Sans',
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 32),
-                  // Product Info
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          body: Column(
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.orderData.productName,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black,
-                                fontFamily: 'Open Sans',
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              widget.orderData.billingCycle,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
-                                fontFamily: 'Open Sans',
-                              ),
-                            ),
-                          ],
+                      // Bill Number
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          'No. Tagihan ${widget.orderData.midtransOrderId}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.green.shade600,
+                            fontFamily: 'Open Sans',
+                          ),
                         ),
                       ),
+
+                      const SizedBox(height: 32),
+                      // Product Info
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.orderData.productName,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black,
+                                    fontFamily: 'Open Sans',
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  widget.orderData.billingCycle,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                    fontFamily: 'Open Sans',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            'Rp. ${_formatNumber(_total)}',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                              fontFamily: 'Open Sans',
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 32),
+                      // Bill Summary Title
                       Text(
-                        'Rp. ${_formatNumber(_total)}',
+                        '${widget.orderData.productDetail} Bill Payment',
                         style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
                           color: Colors.black,
                           fontFamily: 'Open Sans',
                         ),
                       ),
-                    ],
-                  ),
 
-                  const SizedBox(height: 32),
-                  // Bill Summary Title
-                  Text(
-                    '${widget.orderData.productDetail} Bill Payment',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
-                      fontFamily: 'Open Sans',
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-                  // Bill Breakdown Card
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade200),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
-                          spreadRadius: 1,
-                          blurRadius: 3,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        // Cost Breakdown Section (if available)
-                        if (widget.orderData.setupFee != null ||
-                            widget.orderData.serviceCost != null) ...[
-                          // Setup Fee
-                          if (widget.orderData.setupFee != null)
-                            _buildBillRow(
-                              widget.orderData.setupFeeDescription ??
-                                  'Setup Fee',
-                              'Rp. ${_formatNumber(double.tryParse(widget.orderData.setupFee!) ?? 0)}',
-                            ),
-
-                          // Service Cost
-                          if (widget.orderData.serviceCost != null) ...[
-                            if (widget.orderData.setupFee != null)
-                              const SizedBox(height: 16),
-                            _buildBillRow(
-                              widget.orderData.recurringServiceDescription ??
-                                  'Service Cost',
-                              'Rp. ${_formatNumber(double.tryParse(widget.orderData.serviceCost!) ?? 0)}',
+                      const SizedBox(height: 16),
+                      // Bill Breakdown Card
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade200),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.1),
+                              spreadRadius: 1,
+                              blurRadius: 3,
+                              offset: const Offset(0, 1),
                             ),
                           ],
-
-                          const SizedBox(height: 16),
-                          _buildBillRow(
-                            'Subtotal',
-                            'Rp. ${_formatNumber(_subtotal)}',
-                          ),
-                          const SizedBox(height: 16),
-                        ] else ...[
-                          _buildBillRow(
-                            'Product Subtotal',
-                            'Rp. ${_formatNumber(_subtotal)}',
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-
-                        // Tax
-                        _buildBillRow(
-                          '${widget.orderData.taxRate}% VAT',
-                          'Rp. ${_formatNumber(_vat)}',
                         ),
+                        child: Column(
+                          children: [
+                            // Cost Breakdown Section (if available)
+                            if (widget.orderData.setupFee != null ||
+                                widget.orderData.serviceCost != null) ...[
+                              // Setup Fee
+                              if (widget.orderData.setupFee != null)
+                                _buildBillRow(
+                                  widget.orderData.setupFeeDescription ??
+                                      'Setup Fee',
+                                  'Rp. ${_formatNumber(double.tryParse(widget.orderData.setupFee!) ?? 0)}',
+                                ),
 
-                        // Credit (if any)
-                        if (_credit > 0) ...[
-                          const SizedBox(height: 16),
-                          _buildBillRow(
-                            'Credit',
-                            '- Rp. ${_formatNumber(_credit)}',
-                            isDiscount: true,
-                          ),
-                        ],
+                              // Service Cost
+                              if (widget.orderData.serviceCost != null) ...[
+                                if (widget.orderData.setupFee != null)
+                                  const SizedBox(height: 16),
+                                _buildBillRow(
+                                  widget
+                                          .orderData
+                                          .recurringServiceDescription ??
+                                      'Service Cost',
+                                  'Rp. ${_formatNumber(double.tryParse(widget.orderData.serviceCost!) ?? 0)}',
+                                ),
+                              ],
 
-                        const SizedBox(height: 20),
-                        Divider(color: Colors.grey.shade300),
-                        const SizedBox(height: 16),
-                        _buildBillRow(
+                              const SizedBox(height: 16),
+                              _buildBillRow(
+                                'Subtotal',
+                                'Rp. ${_formatNumber(_subtotal)}',
+                              ),
+                              const SizedBox(height: 16),
+                            ] else ...[
+                              _buildBillRow(
+                                'Product Subtotal',
+                                'Rp. ${_formatNumber(_subtotal)}',
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+
+                            // Tax
+                            _buildBillRow(
+                              '${widget.orderData.taxRate}% VAT',
+                              'Rp. ${_formatNumber(_vat)}',
+                            ),
+
+                            // Credit (if any)
+                            if (_credit > 0) ...[
+                              const SizedBox(height: 16),
+                              _buildBillRow(
+                                'Credit',
+                                '- Rp. ${_formatNumber(_credit)}',
+                                isDiscount: true,
+                              ),
+                            ],
+
+                            const SizedBox(height: 20),
+                            Divider(color: Colors.grey.shade300),
+                            const SizedBox(height: 16),
+                            _buildBillRow(
+                              'Total',
+                              'Rp. ${_formatNumber(_total)}',
+                              isTotal: true,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 40),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Bottom Total and Pay Button
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
                           'Total',
-                          'Rp. ${_formatNumber(_total)}',
-                          isTotal: true,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.black,
+                            fontFamily: 'Open Sans',
+                          ),
+                        ),
+                        Text(
+                          'Rp ${_formatNumber(_total)}',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                            fontFamily: 'Open Sans',
+                          ),
                         ),
                       ],
                     ),
-                  ),
-
-                  const SizedBox(height: 40),
-                ],
-              ),
-            ),
-          ),
-
-          // Bottom Total and Pay Button
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: Colors.grey.shade200)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Total',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.black,
-                        fontFamily: 'Open Sans',
+                    // Hanya tampilkan tombol Pay jika status bukan "paid"
+                    if (widget.orderData.invoiceStatus?.toLowerCase() != 'paid')
+                      ElevatedButton(
+                        onPressed: _showMidtransPayment,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4CB04C),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 9,
+                          ),
+                          minimumSize: const Size(100, 48),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text(
+                          'Pay',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Open Sans',
+                          ),
+                        ),
                       ),
-                    ),
-                    Text(
-                      'Rp ${_formatNumber(_total)}',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                        fontFamily: 'Open Sans',
-                      ),
-                    ),
                   ],
                 ),
-                ElevatedButton(
-                  onPressed: _showMidtransPayment,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4CB04C),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 9,
-                    ),
-                    minimumSize: const Size(100, 48),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: const Text(
-                    'Pay',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Open Sans',
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -500,10 +519,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 }
 
-// ============================================================================
-// MIDTRANS SNAP DIALOG WIDGET
-// ============================================================================
-
 class MidtransSnapDialog extends StatefulWidget {
   final String snapToken;
   final String clientKey;
@@ -535,12 +550,10 @@ class _MidtransSnapDialogState extends State<MidtransSnapDialog> {
   void _handlePaymentFinished(Map<String, dynamic> result) {
     // Cegah multiple callbacks
     if (_isPaymentProcessed) {
-      print('Payment already processed, ignoring duplicate callback');
       return;
     }
 
     _isPaymentProcessed = true;
-    print('Processing payment result: ${result['status']}');
 
     // Close dialog
     if (mounted) {
@@ -613,22 +626,16 @@ class _MidtransSnapDialogState extends State<MidtransSnapDialog> {
                             },
                           );
                         },
-                        onLoadStart: (controller, url) {
-                          print('Loading started: $url');
-                        },
+                        onLoadStart: (controller, url) {},
                         onLoadStop: (controller, url) {
-                          print('Loading finished: $url');
                           if (mounted) {
                             setState(() {
                               _isLoading = false;
                             });
                           }
                         },
-                        onConsoleMessage: (controller, consoleMessage) {
-                          print('Console: ${consoleMessage.message}');
-                        },
+                        onConsoleMessage: (controller, consoleMessage) {},
                         onLoadError: (controller, url, code, message) {
-                          print('Load error: $code - $message');
                           if (mounted) {
                             setState(() {
                               _isLoading = false;

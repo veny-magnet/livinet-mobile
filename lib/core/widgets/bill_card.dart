@@ -21,8 +21,7 @@ class BillCard extends StatefulWidget {
   final bool useOrderDetails;
   final String? userId;
   final int? userAddressId;
-  final order_detail.OrderDetail?
-  orderDetailData; // Store OrderDetail when provided
+  final order_detail.OrderDetail? orderDetailData;
 
   const BillCard({
     super.key,
@@ -40,7 +39,6 @@ class BillCard extends StatefulWidget {
   });
 
   /// Constructor to create BillCard from OrderDetail
-  /// This maintains the existing display but uses OrderDetail data internally
   factory BillCard.fromOrderDetail({
     required order_detail.OrderDetail orderDetail,
     String? userId,
@@ -69,7 +67,7 @@ class BillCard extends StatefulWidget {
 
 class _BillCardState extends State<BillCard> {
   bool _isProcessingPayment = false;
-  final OrderDetailsService _orderDetailsService = OrderDetailsService();
+  final OrderDetailsService _orderDetailsService = OrderDetailsService.instance;
   order_detail.OrderDetail? _currentOrderDetail;
 
   @override
@@ -106,50 +104,8 @@ class _BillCardState extends State<BillCard> {
         }
       }
     } catch (e) {
-      print('Error loading order details: $e');
       // Fallback to existing BillHistory data - no error shown to user
     }
-  }
-
-  /// Create mock OrderResponse from OrderDetail for payment compatibility
-  OrderResponse _createOrderResponseFromOrderDetail(
-    order_detail.OrderDetail orderDetail,
-  ) {
-    return OrderResponse(
-      productId: orderDetail.productData.productId,
-      productName: orderDetail.serviceName,
-      productPrice: orderDetail.productData.productPrice,
-      productDetail: orderDetail.serviceGroup,
-      subsplanId: orderDetail.productData.subsplanId,
-      subsplanName: orderDetail.productData.subsplanName,
-      paymentDeadline: orderDetail.statusData.paymentDeadline ?? '',
-      status: orderDetail.statusData.orderStatus,
-      invoiceStatus: orderDetail.invoiceStatus,
-      orderStatus: orderDetail.statusData.orderStatus,
-      code: orderDetail.orderCode ?? '',
-      amount: orderDetail.invoiceAmount,
-      midtransLink: MidtransLink(
-        token: orderDetail.midtransData.midtransToken,
-        redirectUrl: orderDetail.midtransData.midtransRedirectUrl,
-      ),
-      midtransClient: orderDetail.midtransData.midtransClientKey,
-      merchantBaseUrl: orderDetail.midtransData.midtransMerchantBaseUrl,
-      midtransOrderId: orderDetail.midtransData.midtransOrderId,
-      data: {
-        'order': {
-          'invoice': {
-            'subtotal': orderDetail.invoiceDetails.subtotal,
-            'tax': orderDetail.invoiceDetails.tax,
-            'taxrate': orderDetail.invoiceDetails.taxRate,
-            'credit': orderDetail.invoiceDetails.credit,
-            'total': orderDetail.invoiceDetails.total,
-          },
-        },
-        'services': [
-          {'billingcycle': orderDetail.billingCycle},
-        ],
-      },
-    );
   }
 
   /// Fallback method to handle bill payment using old flow (create order from bill)
@@ -231,8 +187,7 @@ class _BillCardState extends State<BillCard> {
       if (result['success'] == true && result['data'] != null) {
         final orderResponse = result['data'] as OrderResponse;
 
-        // Clear caches to ensure fresh data after payment
-        ProductService.instance.clearCache(userId: userData['user_id']);
+        // Cache clearing removed - no longer needed
 
         // Navigate to payment screen with real API response
         Navigator.push(
@@ -283,14 +238,11 @@ class _BillCardState extends State<BillCard> {
       // If ProductService couldn't find a suitable product ID, return error
       throw Exception('No suitable product found for bill payment');
     } catch (e) {
-      print('Error getting product ID for bill: $e');
-
       // Absolute fallback - this should rarely be used
       if (widget.billData?.invoiceId != null &&
           widget.billData!.invoiceId.isNotEmpty) {
         final parsed = int.tryParse(widget.billData!.invoiceId);
         if (parsed != null && parsed > 0) {
-          print('Using invoice ID as ultimate fallback: $parsed');
           return parsed;
         }
       }
@@ -402,7 +354,7 @@ class _BillCardState extends State<BillCard> {
 
   Future<void> _handlePayment() async {
     // Priority 1: Use OrderDetail data directly passed from constructor
-    if (widget.orderDetailData != null && !widget.orderDetailData!.isPaid) {
+    if (widget.orderDetailData != null) {
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -420,7 +372,7 @@ class _BillCardState extends State<BillCard> {
     }
 
     // Priority 2: Use loaded OrderDetail data from API
-    if (_currentOrderDetail != null && !_currentOrderDetail!.isPaid) {
+    if (_currentOrderDetail != null) {
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -451,13 +403,13 @@ class _BillCardState extends State<BillCard> {
         );
 
         if (response != null && response.orders.isNotEmpty) {
-          // Find matching order for this bill
+          // Find matching order for this bill (tidak peduli isPaid atau tidak)
           final matchingOrder = response.orders.where((order) {
             return order.midtransOrderId == widget.billData!.midtransOrderId ||
-                (order.formattedAmount == widget.amount && !order.isPaid);
+                order.formattedAmount == widget.amount;
           }).firstOrNull;
 
-          if (matchingOrder != null && !matchingOrder.isPaid) {
+          if (matchingOrder != null) {
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -477,7 +429,6 @@ class _BillCardState extends State<BillCard> {
         // If no OrderDetails found, fallback to old flow (create order from bill)
         await _handleBillPaymentFallback();
       } catch (e) {
-        print('Error loading OrderDetails for bill: $e');
         // Fallback to old flow if OrderDetails loading fails
         await _handleBillPaymentFallback();
       } finally {
@@ -494,10 +445,6 @@ class _BillCardState extends State<BillCard> {
     if (widget.onPayPressed != null) {
       widget.onPayPressed!();
     }
-
-    setState(() {
-      _isProcessingPayment = true;
-    });
   }
 
   @override
@@ -552,44 +499,46 @@ class _BillCardState extends State<BillCard> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    ElevatedButton(
-                      onPressed: (_isProcessingPayment || widget.isProcessing)
-                          ? null
-                          : _handlePayment,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF4CB04C),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
+                    // Hanya tampilkan button Pay jika status bukan "paid"
+                    if (widget.status.toLowerCase() != 'paid')
+                      ElevatedButton(
+                        onPressed: (_isProcessingPayment || widget.isProcessing)
+                            ? null
+                            : _handlePayment,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4CB04C),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 32,
+                            vertical: 10,
+                          ),
+                          minimumSize: const Size(60, 32),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 32,
-                          vertical: 10,
-                        ),
-                        minimumSize: const Size(60, 32),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: (_isProcessingPayment || widget.isProcessing)
-                          ? const SizedBox(
-                              height: 16,
-                              width: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
+                        child: (_isProcessingPayment || widget.isProcessing)
+                            ? const SizedBox(
+                                height: 16,
+                                width: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : const Text(
+                                'Pay',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: 'Open Sans',
                                 ),
                               ),
-                            )
-                          : const Text(
-                              'Pay',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                fontFamily: 'Open Sans',
-                              ),
-                            ),
-                    ),
+                      ),
                   ],
                 ),
 

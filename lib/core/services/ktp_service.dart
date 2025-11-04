@@ -24,7 +24,7 @@ class KtpService {
         'Accept': 'application/json',
       });
 
-      // Add form fields
+      // Add user_id from registration response
       request.fields['user_id'] = userId;
 
       // Add image file

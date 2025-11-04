@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/services/address_service.dart';
-import '../../core/services/product_service.dart';
+// ProductService import removed - no longer needed
 import '../../core/services/location_service.dart';
 import '../../core/widgets/confirmation_dialog.dart';
 import '../../core/models/state_model.dart';
@@ -284,8 +284,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       });
 
       if (result['success'] == true) {
-        // Clear product cache for this user when new address is added
-        ProductService.instance.clearCache(userId: widget.userId);
+        // Cache clearing removed - no longer needed
 
         DialogHelper.showSuccess(
           context,
@@ -535,16 +534,6 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                                   size: 16,
                                 ),
                                 const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Location selection (City, State, Area) will be implemented in future updates. Currently using default location.',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.blue.shade700,
-                                      fontFamily: 'Open Sans',
-                                    ),
-                                  ),
-                                ),
                               ],
                             ),
                           ),

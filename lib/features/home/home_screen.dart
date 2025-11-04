@@ -63,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       try {
         // Priority 1: Try OrderDetails first
         if (selectedAddressId != null) {
-          final orderDetailsService = OrderDetailsService();
+          final orderDetailsService = OrderDetailsService.instance;
           await orderDetailsService.getOrderDetails(
             userId: userId,
             userAddressId: selectedAddressId!,
@@ -95,39 +95,45 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _loadUserProfile() async {
+    setState(() {
+      isLoading = true;
+    });
+
     try {
       // Get user data from auth service or current session
       final result = await UserProfileService.instance.getCurrentUserProfile();
 
       if (result['success'] == true && result['data'] != null) {
         final data = result['data'];
-        setState(() {
-          username = data.username ?? 'User';
-          userId = data.userId ?? '';
-          points = data.points ?? 0;
-          status = data.status ?? '';
-          isLoading = false;
-        });
+        // Don't call setState here - will be called once at the end
+        username = data.username ?? 'User';
+        userId = data.userId ?? '';
+        points = data.points ?? 0;
+        status = data.status ?? '';
 
         // Load bill history if user is verified and has userId
         if (status == 'verified' && userId.isNotEmpty) {
           await _loadBillHistory();
         }
-      } else {
+
         setState(() {
-          username = 'User';
-          userId = '';
-          points = 0;
-          status = '';
           isLoading = false;
         });
-      }
-    } catch (e) {
-      setState(() {
+      } else {
         username = 'User';
         userId = '';
         points = 0;
         status = '';
+        setState(() {
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      username = 'User';
+      userId = '';
+      points = 0;
+      status = '';
+      setState(() {
         isLoading = false;
       });
     }
@@ -136,9 +142,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _loadBillHistory() async {
     try {
       if (userId.isEmpty) {
-        setState(() {
-          errorMessage = 'User ID not available';
-        });
+        errorMessage = 'User ID not available';
         return;
       }
 
@@ -153,7 +157,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           selectedAddressId = addresses.first.addressId;
 
           // PRIORITY 1: Try OrderDetails API first
-          final orderDetailsService = OrderDetailsService();
+          final orderDetailsService = OrderDetailsService.instance;
           final orderDetailsResponse = await orderDetailsService
               .getOrderDetails(
                 userId: userId,
@@ -162,14 +166,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
           if (orderDetailsResponse != null &&
               orderDetailsResponse.orders.isNotEmpty) {
-            setState(() {
-              orderDetailsData = orderDetailsResponse;
-              currentOrderDetail = orderDetailsResponse.orders.first;
-              // Convert OrderDetail to BillHistory for backward compatibility if needed
-              billHistory = _convertOrderDetailsToBillHistory(
-                orderDetailsResponse.orders,
-              );
-            });
+            // Don't call setState here - will be called once in _loadUserProfile
+            orderDetailsData = orderDetailsResponse;
+            currentOrderDetail = orderDetailsResponse.orders.first;
+            // Convert OrderDetail to BillHistory for backward compatibility if needed
+            billHistory = _convertOrderDetailsToBillHistory(
+              orderDetailsResponse.orders,
+            );
             await _loadCurrentPlanName();
             return;
           }
@@ -183,9 +186,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           final result = await BillService.instance.getBillHistory(billRequest);
 
           if (result['success'] == true && result['data'] != null) {
-            setState(() {
-              billHistory = result['data'] as List<BillHistory>;
-            });
+            // Don't call setState here - will be called once in _loadUserProfile
+            billHistory = result['data'] as List<BillHistory>;
 
             // Load product name after getting bill history
             await _loadCurrentPlanName();
@@ -199,28 +201,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     .convertSubscriptionsToBills(
                       subscriptionResult['data'] as Map<String, dynamic>,
                     );
-                setState(() {
-                  billHistory = subscriptionBills;
-                });
+                billHistory = subscriptionBills;
               } else {
-                setState(() {
-                  errorMessage =
-                      result['message'] ??
-                      'Failed to load bill history and subscriptions';
-                });
+                errorMessage =
+                    result['message'] ??
+                    'Failed to load bill history and subscriptions';
               }
             } catch (e) {
-              setState(() {
-                errorMessage = 'Error loading data: $e';
-              });
+              errorMessage = 'Error loading data: $e';
             }
           }
         }
       }
     } catch (e) {
-      setState(() {
-        errorMessage = 'Error loading bill history: $e';
-      });
+      errorMessage = 'Error loading bill history: $e';
     }
   }
 
@@ -254,9 +248,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               : currentOrderDetail!.serviceName;
 
           if (planName.isNotEmpty) {
-            setState(() {
-              currentPlanName = planName;
-            });
+            // Don't call setState here - will be called once in _loadUserProfile
+            currentPlanName = planName;
             return;
           }
         }
@@ -285,9 +278,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 currentSubscription['name']?.toString();
 
             if (planName != null && planName.isNotEmpty) {
-              setState(() {
-                currentPlanName = planName;
-              });
+              // Don't call setState here - will be called once in _loadUserProfile
+              currentPlanName = planName;
               return;
             }
           }
@@ -302,9 +294,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         if (products['success'] == true && products['data'] != null) {
           final productList = products['data'] as List<Product>;
           if (productList.isNotEmpty) {
-            setState(() {
-              currentPlanName = productList.first.name;
-            });
+            // Don't call setState here - will be called once in _loadUserProfile
+            currentPlanName = productList.first.name;
           }
         }
       }
@@ -413,8 +404,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     AddressSelector(
                       userId: userId.isNotEmpty ? userId : '',
                       defaultAddress: '',
-                      onAddressSelected: (selectedAddress) {
-                        // TODO: Update bill or other components based on selected address
+                      onAddressSelected: (selectedAddress) async {
+                        setState(() {
+                          selectedAddressId = selectedAddress.addressId;
+                        });
+
+                        // Reload bill history dengan address yang baru dipilih
+                        await _loadBillHistory();
                       },
                     ),
 

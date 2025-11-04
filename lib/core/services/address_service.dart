@@ -3,8 +3,6 @@ import 'package:http/http.dart' as http;
 import 'auth_service.dart';
 import '../config/app_config.dart';
 import 'app_logger.dart';
-import '../cache/cache_manager.dart';
-import '../cache/cache.dart';
 
 class UserAddress {
   final String userId;
@@ -70,9 +68,6 @@ class UserAddress {
 class AddressService {
   final _config = AppConfig.instance;
   final _logger = AppLogger.instance;
-  final _cacheManager = CacheManager.instance;
-
-  static const String CACHE_VERSION = '1.0.0';
 
   static AddressService? _instance;
 
@@ -83,46 +78,12 @@ class AddressService {
     return _instance!;
   }
 
-  /// Get user addresses with authentication
+  /// Get user addresses with authentication - NO CACHE
   Future<Map<String, dynamic>> getUserAddresses(
     String userId, {
     bool forceRefresh = false,
   }) async {
     try {
-      final cacheKey = 'addresses_$userId';
-
-      // Define cache configuration: 30 min fresh, 4 hours stale (addresses rarely change)
-      final cacheConfig = CacheConfig(
-        maxAge: const Duration(minutes: 30),
-        staleAge: const Duration(hours: 4),
-        strategy: CacheStrategy.cacheFirst,
-        version: CACHE_VERSION,
-      );
-
-      // Check cache first unless force refresh
-      if (!forceRefresh) {
-        final cached = await _cacheManager.get<List<UserAddress>>(
-          cacheKey,
-          cacheConfig,
-          (json) {
-            final addressesData = json['addresses'] as List;
-            return addressesData
-                .map(
-                  (item) => UserAddress.fromJson(item as Map<String, dynamic>),
-                )
-                .toList();
-          },
-        );
-
-        if (cached != null) {
-          return {
-            'success': true,
-            'data': cached.data,
-            'message': 'Addresses fetched from cache',
-          };
-        }
-      }
-
       // Get auth token
       final authService = AuthService();
       final token = await authService.getAuthToken();
@@ -159,11 +120,6 @@ class AddressService {
           final addresses = addressesData
               .map((json) => UserAddress.fromJson(json))
               .toList();
-
-          // Store in cache
-          await _cacheManager.set(cacheKey, {
-            'addresses': addresses.map((a) => a.toJson()).toList(),
-          }, cacheConfig);
 
           return {
             'success': true,
@@ -217,20 +173,6 @@ class AddressService {
     }
   }
 
-  /// Clear cached addresses
-  Future<void> clearCache({String? userId}) async {
-    if (userId != null) {
-      // Clear cache for specific user
-      final cacheKey = 'addresses_$userId';
-      await _cacheManager.invalidate(cacheKey);
-      _logger.debug('Cleared address cache for user: $userId');
-    } else {
-      // Clear all address cache
-      await _cacheManager.invalidatePattern(r'^addresses_.*');
-      _logger.debug('Cleared all address cache');
-    }
-  }
-
   /// Force refresh addresses (bypass cache)
   Future<Map<String, dynamic>> refreshAddresses(String userId) async {
     return await getUserAddresses(userId, forceRefresh: true);
@@ -281,7 +223,6 @@ class AddressService {
 
         if (responseData['code'] == 200 && responseData['success'] == true) {
           // Clear cache to force refresh
-          clearCache(userId: userId);
 
           return {
             'success': true,
@@ -369,9 +310,6 @@ class AddressService {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
 
         if (responseData['code'] == 200 && responseData['success'] == true) {
-          // Clear cache to force refresh
-          clearCache(userId: userId);
-
           return {
             'success': true,
             'data': responseData['data'],
@@ -446,9 +384,6 @@ class AddressService {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
 
         if (responseData['code'] == 200 && responseData['success'] == true) {
-          // Clear cache to force refresh
-          clearCache(userId: userId);
-
           return {
             'success': true,
             'data': responseData['data'],

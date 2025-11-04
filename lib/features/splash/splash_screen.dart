@@ -83,7 +83,10 @@ class _SplashScreenState extends State<SplashScreen>
                   if (logoWidth < minLogo) logoWidth = minLogo;
                   if (logoWidth > maxLogo) logoWidth = maxLogo;
 
-                  final spacing = (constraints.maxHeight * 0.015).clamp(8.0, 24.0);
+                  final spacing = (constraints.maxHeight * 0.015).clamp(
+                    8.0,
+                    24.0,
+                  );
 
                   return Center(
                     child: Padding(

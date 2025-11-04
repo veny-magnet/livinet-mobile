@@ -13,7 +13,7 @@ import '../../core/services/product_service.dart';
 import '../../core/services/subscription_service.dart';
 import '../../core/services/address_manager.dart';
 import '../../core/services/address_service.dart';
-import '../../core/services/bill_service.dart';
+// BillService removed - no longer needed for cache clearing
 import '../../core/services/order_service.dart';
 import '../../core/models/order_models.dart';
 import 'products_detail_screen.dart';
@@ -54,10 +54,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   void _onAddressChanged(UserAddress? address) {
-    // Clear product cache before loading new products
+    // Cache clearing removed - no longer needed
     if (status == 'verified' && userId.isNotEmpty) {
-      ProductService.instance.clearCache(userId: userId);
-
       Future.delayed(const Duration(milliseconds: 100), () {
         if (mounted) {
           if (hasSubscription) {
@@ -110,14 +108,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   Future<void> _checkUserSubscription(String userId) async {
     try {
-      print('ProductsScreen: Checking subscription for user: $userId');
-
       final subscriptionResult = await SubscriptionService.instance
           .getUserSubscriptions(userId);
-
-      print('ProductsScreen: Subscription result: $subscriptionResult');
-      print('ProductsScreen: Success: ${subscriptionResult['success']}');
-      print('ProductsScreen: Data: ${subscriptionResult['data']}');
 
       if (subscriptionResult['success'] == true &&
           subscriptionResult['data'] != null &&
@@ -127,30 +119,21 @@ class _ProductsScreenState extends State<ProductsScreen> {
         final subscriptions =
             subscriptionResult['data']['subscriptions'] as List;
 
-        print('ProductsScreen: Found ${subscriptions.length} subscription(s)');
-        print('ProductsScreen: Subscription data: ${subscriptions.first}');
-
         final planName =
             subscriptions.first['subsplanName']?.toString() ??
             subscriptions.first['productDescription']?.toString() ??
             'Current Plan';
-
-        print('ProductsScreen: Plan name: $planName');
 
         setState(() {
           hasSubscription = true;
           currentPlan = planName;
         });
 
-        print('ProductsScreen: hasSubscription set to TRUE');
-
         // Load add-ons for subscription
         final selectedAddressId = AddressManager.instance.selectedAddressId;
         await _loadAddOns(userId, selectedAddressId);
       } else {
         // No subscription, load products normally
-        print('ProductsScreen: No active subscription found');
-        print('ProductsScreen: Loading products instead...');
 
         setState(() {
           hasSubscription = false;
@@ -159,10 +142,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
         await _loadProducts(userId, selectedAddressId);
       }
     } catch (e, stackTrace) {
-      // If subscription check fails, fallback to normal product loading
-      print('ProductsScreen: Error checking subscription: $e');
-      print('ProductsScreen: Stack trace: $stackTrace');
-
       setState(() {
         hasSubscription = false;
       });
@@ -389,8 +368,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   void _navigateToHome() {
-    BillService.instance.clearCache(userId: userId);
-    ProductService.instance.clearCache(userId: userId);
+    // Cache clearing removed - no longer needed
 
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const HomeScreen()),
@@ -400,10 +378,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print(
-      'ProductsScreen: Building widget - isLoading: $isLoading, hasSubscription: $hasSubscription, status: $status',
-    );
-
     if (isLoading) {
       return Scaffold(
         backgroundColor: const Color(0xFFF8F9FA),
@@ -418,10 +392,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
     if (status == 'not_verified') {
       return const NotVerifiedWidget(currentRoute: '/products');
     }
-
-    print(
-      'ProductsScreen: Showing main content - hasSubscription: $hasSubscription',
-    );
 
     // Show different content based on subscription status
     return Scaffold(

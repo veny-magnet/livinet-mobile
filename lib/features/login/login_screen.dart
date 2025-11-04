@@ -5,7 +5,6 @@ import '../../core/widgets/app_button.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/fcm_service.dart';
 import '../../core/services/app_initializer.dart';
-import '../../core/services/push_notification_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -68,8 +67,8 @@ class _LoginScreenState extends State<LoginScreen> {
         final currentUser = await _authService.getCurrentUser();
         if (currentUser != null && currentUser['user_id'] != null) {
           final userId = currentUser['user_id'] as String;
+
           setState(() => _loadingMessage = 'Signing in');
-          await PushNotificationService.instance.subscribeToUserTopics(userId);
         }
 
         if (initResult['success']) {

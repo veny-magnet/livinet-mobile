@@ -138,8 +138,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       // Haptic feedback
       HapticFeedback.lightImpact();
 
-      print('ChangePasswordScreen: Getting user ID from AuthService');
-
       // Get user ID from AuthService
       final authService = AuthService();
       final currentUser = await authService.getCurrentUser();
@@ -173,8 +171,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
       final userId = currentUser['user_id'] as String;
 
-      print('ChangePasswordScreen: Calling manual changePassword API');
-
       // Call the manual password change API (not reset)
       final result = await ProfileUpdateService.instance.changePassword(
         userId: userId,
@@ -182,8 +178,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         newPassword: _newPasswordController.text,
         confirmPassword: _confirmPasswordController.text,
       );
-
-      print('ChangePasswordScreen: API result: $result');
 
       if (mounted) {
         if (result['success'] == true) {
@@ -268,7 +262,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         }
       }
     } catch (e) {
-      print('ChangePasswordScreen: Exception: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

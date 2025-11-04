@@ -1,10 +1,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class NoPlanWidget extends StatelessWidget {
-  final VoidCallback? onBuyPlanPressed;
-
-  const NoPlanWidget({super.key, this.onBuyPlanPressed});
+  const NoPlanWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -45,11 +44,9 @@ class NoPlanWidget extends StatelessWidget {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed:
-                      onBuyPlanPressed ??
-                      () {
-                        Navigator.pushNamed(context, '/products');
-                      },
+                  onPressed: () {
+                    context.push('/products');
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF4CB04C),
                     foregroundColor: Colors.white,

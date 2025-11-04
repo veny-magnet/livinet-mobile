@@ -1,7 +1,5 @@
 import '../services/base_api_service.dart';
 import '../models/bill_models.dart';
-import '../cache/cache_manager.dart';
-import '../cache/cache.dart';
 import 'app_logger.dart';
 
 class BillService {
@@ -12,9 +10,6 @@ class BillService {
 
   final BaseApiService _apiService = BaseApiService();
   final _logger = AppLogger.instance;
-  final _cacheManager = CacheManager.instance;
-
-  static const String CACHE_VERSION = '1.0.0';
 
   // Add proper headers with authentication
   Map<String, String> _getHeaders(String? token) {
@@ -28,54 +23,10 @@ class BillService {
   Future<Map<String, dynamic>> getBillHistory(
     BillHistoryRequest request, {
     String? authToken, // Add auth token parameter
-    bool forceRefresh = false, // Add force refresh option
+    bool forceRefresh = false, // Kept for API compatibility
   }) async {
     try {
-      final cacheKey = 'bills_${request.userId}_${request.userAddressId}';
-
-      // Determine cache duration based on status
-      // Unpaid bills: 10 min fresh (can change when paid)
-      // Paid bills: 1 hour fresh (won't change)
-      final isPaidQuery = request.toString().contains('paid');
-      final freshDuration = isPaidQuery
-          ? const Duration(hours: 1)
-          : const Duration(minutes: 10);
-
-      final cacheConfig = CacheConfig(
-        maxAge: freshDuration,
-        staleAge: const Duration(hours: 2),
-        strategy: CacheStrategy.staleWhileRevalidate,
-        version: CACHE_VERSION,
-      );
-
-      // Try cache first (unless force refresh)
-      if (!forceRefresh) {
-        final cached = await _cacheManager.get<List<BillHistory>>(
-          cacheKey,
-          cacheConfig,
-          (json) {
-            final billsData = json['bills'] as List;
-            return billsData
-                .map(
-                  (item) => BillHistory.fromJson(item as Map<String, dynamic>),
-                )
-                .toList();
-          },
-        );
-
-        if (cached != null && !cached.isExpired(cacheConfig.maxAge)) {
-          _logger.debug('Cache HIT: $cacheKey');
-          return {
-            'success': true,
-            'message': 'Bills from cache',
-            'data': cached.data,
-            'source': 'cache',
-          };
-        }
-      }
-
-      _logger.debug('Cache MISS, fetching from API: $cacheKey');
-
+      // NO CACHE - Always fetch fresh from API
       final response = await _apiService.get<List<BillHistory>>(
         '/get/billhistory',
         headers: _getHeaders(authToken),
@@ -116,12 +67,7 @@ class BillService {
       );
 
       if (response.success) {
-        // Update cache
         final bills = response.data ?? <BillHistory>[];
-
-        await _cacheManager.set(cacheKey, {
-          'bills': bills.map((b) => b.toJson()).toList(),
-        }, cacheConfig);
 
         return {
           'success': true,
@@ -147,34 +93,7 @@ class BillService {
     }
   }
 
-  /// Clear cached bills
-  Future<void> clearCache({String? userId, int? addressId}) async {
-    if (userId != null && addressId != null) {
-      final cacheKey = 'bills_${userId}_$addressId';
-      await _cacheManager.invalidate(cacheKey);
-      _logger.debug('Cleared bill cache for: $cacheKey');
-    } else if (userId != null) {
-      // Clear all cache entries for this user using pattern matching
-      await _cacheManager.invalidatePattern(r'^bills_' + userId + r'_\d+\$');
-      _logger.debug('Cleared all bill cache for user: $userId');
-    } else {
-      // Clear all bill cache
-      await _cacheManager.invalidatePattern(r'^bills_.*');
-      _logger.debug('Cleared all bill cache');
-    }
-  }
-
-  /// Force refresh bills (bypass cache)
-  Future<Map<String, dynamic>> refreshBillHistory(
-    BillHistoryRequest request, {
-    String? authToken,
-  }) async {
-    return await getBillHistory(
-      request,
-      authToken: authToken,
-      forceRefresh: true,
-    );
-  }
+  // Cache methods removed - no longer needed without cache system
 
   /// Get detailed bill information
   Future<Map<String, dynamic>> getBillHistoryDetail({

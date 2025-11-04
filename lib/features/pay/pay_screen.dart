@@ -40,28 +40,38 @@ class _PayScreenState extends State<PayScreen> {
   }
 
   Future<void> _loadData() async {
-    // For testing, ensure we have a token
-    await _ensureAuthToken();
+    setState(() {
+      isLoading = true;
+      errorMessage = '';
+    });
 
-    await _loadUserProfile();
-    if (status != 'not_verified') {
-      await _loadBillHistory();
+    try {
+      // For testing, ensure we have a token
+      await _ensureAuthToken();
+
+      await _loadUserProfile();
+
+      if (status != 'not_verified' && userId.isNotEmpty) {
+        await _loadBillHistory();
+      }
+
+      setState(() {
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+        errorMessage = 'Error loading data: $e';
+      });
     }
   }
 
   Future<void> _ensureAuthToken() async {
     try {
       final authService = AuthService();
-      final token = await authService.getAuthToken();
-
-      if (token == null || token.isEmpty) {
-        // For testing, set a dummy token
-        // In production, this should redirect to login screen
-        print('No auth token found - user should login first');
-        // You might want to navigate to login screen here
-      }
+      await authService.getAuthToken();
     } catch (e) {
-      print('Error checking auth token: $e');
+      // Ignore errors here
     }
   }
 
@@ -71,34 +81,23 @@ class _PayScreenState extends State<PayScreen> {
 
       if (result['success'] == true && result['data'] != null) {
         final data = result['data'];
-        setState(() {
-          status = data.status ?? '';
-          userId = data.userId ?? '';
-          isLoading = false;
-        });
+        // Don't call setState here - will be called once in _loadData
+        status = data.status ?? '';
+        userId = data.userId ?? '';
       } else {
-        setState(() {
-          status = '';
-          userId = '';
-          isLoading = false;
-        });
-      }
-    } catch (e) {
-      setState(() {
         status = '';
         userId = '';
-        isLoading = false;
-      });
+      }
+    } catch (e) {
+      status = '';
+      userId = '';
     }
   }
 
   Future<void> _loadBillHistory() async {
     try {
       if (userId.isEmpty) {
-        setState(() {
-          errorMessage = 'User ID not available';
-          isLoading = false;
-        });
+        errorMessage = 'User ID not available';
         return;
       }
 
@@ -113,8 +112,7 @@ class _PayScreenState extends State<PayScreen> {
           selectedAddressId = addresses.first.addressId;
 
           // Load OrderDetails for BillCard only
-          print('PayScreen: Loading OrderDetails for BillCard...');
-          final orderDetailsService = OrderDetailsService();
+          final orderDetailsService = OrderDetailsService.instance;
           final orderDetailsResponse = await orderDetailsService
               .getOrderDetails(
                 userId: userId,
@@ -123,20 +121,16 @@ class _PayScreenState extends State<PayScreen> {
 
           if (orderDetailsResponse != null &&
               orderDetailsResponse.orders.isNotEmpty) {
-            setState(() {
-              orderDetailsData = orderDetailsResponse;
-              currentOrderDetail = orderDetailsResponse.orders.first;
-            });
+            // Don't call setState here - will be called once in _loadData
+            orderDetailsData = orderDetailsResponse;
+            currentOrderDetail = orderDetailsResponse.orders.first;
             await _loadCurrentPlanName();
           } else {
-            setState(() {
-              orderDetailsData = null;
-              currentOrderDetail = null;
-            });
+            orderDetailsData = null;
+            currentOrderDetail = null;
           }
 
           // Load BillHistory for Payment History section
-          print('PayScreen: Loading BillHistory for Payment History...');
           final billRequest = BillHistoryRequest(
             userId: userId,
             userAddressId: selectedAddressId!,
@@ -145,33 +139,19 @@ class _PayScreenState extends State<PayScreen> {
           final result = await BillService.instance.getBillHistory(billRequest);
 
           if (result['success'] == true && result['data'] != null) {
-            setState(() {
-              billHistory = result['data'] as List<BillHistory>;
-              isLoading = false;
-            });
+            // Don't call setState here - will be called once in _loadData
+            billHistory = result['data'] as List<BillHistory>;
           } else {
-            setState(() {
-              billHistory = [];
-              isLoading = false;
-            });
+            billHistory = [];
           }
         } else {
-          setState(() {
-            errorMessage = 'No address found';
-            isLoading = false;
-          });
+          errorMessage = 'No address found';
         }
       } else {
-        setState(() {
-          errorMessage = 'Failed to load addresses';
-          isLoading = false;
-        });
+        errorMessage = 'Failed to load addresses';
       }
     } catch (e) {
-      setState(() {
-        errorMessage = 'Error loading data: $e';
-        isLoading = false;
-      });
+      errorMessage = 'Error loading data: $e';
     }
   }
 
@@ -186,14 +166,11 @@ class _PayScreenState extends State<PayScreen> {
             : currentOrderDetail!.serviceName;
 
         if (planName.isNotEmpty) {
-          setState(() {
-            currentPlanName = planName;
-          });
-          print('PayScreen: Updated plan name from OrderDetails to: $planName');
+          // Don't call setState here - will be called once in _loadData
+          currentPlanName = planName;
         }
       }
     } catch (e) {
-      print('PayScreen: Error loading current plan name: $e');
       // Keep default name if error occurs
     }
   }

@@ -1,24 +1,21 @@
 import '../models/order_detail_models.dart';
 import 'app_logger.dart';
 import 'base_api_service.dart';
-import '../cache/cache_manager.dart';
-import '../cache/cache.dart';
 
 class OrderDetailsService {
-  static const String CACHE_VERSION = '1.0.0';
+  static final OrderDetailsService _instance = OrderDetailsService._internal();
+  static OrderDetailsService get instance => _instance;
+  OrderDetailsService._internal() : _apiService = BaseApiService();
 
   final BaseApiService _apiService;
   final _logger = AppLogger.instance;
-  final _cacheManager = CacheManager.instance;
-
-  OrderDetailsService({BaseApiService? apiService})
-    : _apiService = apiService ?? BaseApiService();
 
   /// Get order details with optional user_address_id filter
+  /// NO CACHE - Always fetch fresh data from server
   Future<OrderDetailsResponse?> getOrderDetails({
     required String userId,
     int? userAddressId,
-    bool forceRefresh = false,
+    bool forceRefresh = false, // Keep parameter for backward compatibility
   }) async {
     try {
       // Create request object
@@ -27,37 +24,11 @@ class OrderDetailsService {
         userAddressId: userAddressId,
       );
 
-      final cacheKey = 'orders_${userId}_${userAddressId ?? "all"}';
-
-      // Define cache configuration: 15 min fresh, 2 hours stale
-      final cacheConfig = CacheConfig(
-        maxAge: const Duration(minutes: 15),
-        staleAge: const Duration(hours: 2),
-        strategy: CacheStrategy.staleWhileRevalidate,
-        version: CACHE_VERSION,
-      );
-
-      // Check cache first unless forced refresh
-      if (!forceRefresh) {
-        final cached = await _cacheManager.get<OrderDetailsResponse>(
-          cacheKey,
-          cacheConfig,
-          (json) {
-            return OrderDetailsResponse.fromJson(json);
-          },
-        );
-
-        if (cached != null) {
-          _logger.debug('Returning cached order details');
-          return cached.data;
-        }
-      }
-
       _logger.debug(
         'Fetching order details for user: $userId, addressId: $userAddressId',
       );
 
-      // Make API request
+      // Make API request - NO CACHE, always fresh
       final response = await _apiService.get<Map<String, dynamic>>(
         '/get/orderdetails',
         queryParams: request.toQueryParams(),
@@ -68,14 +39,6 @@ class OrderDetailsService {
         final orderDetailsResponse = OrderDetailsResponse.fromJson(
           response.data!,
         );
-
-        // Cache the successful response
-        await _cacheManager.set(cacheKey, {
-          'orders': orderDetailsResponse.orders
-              .map((order) => _orderDetailToJson(order))
-              .toList(),
-          'total': orderDetailsResponse.total,
-        }, cacheConfig);
 
         _logger.debug(
           'Successfully fetched ${orderDetailsResponse.orders.length} orders',
@@ -177,28 +140,7 @@ class OrderDetailsService {
     );
   }
 
-  /// Clear cached data
-  Future<void> clearCache({String? userId, int? userAddressId}) async {
-    try {
-      if (userId != null && userAddressId != null) {
-        final cacheKey = 'orders_${userId}_$userAddressId';
-        await _cacheManager.invalidate(cacheKey);
-        _logger.debug('Cleared order cache for: $cacheKey');
-      } else if (userId != null) {
-        // Clear all orders for this user
-        await _cacheManager.invalidatePattern(r'^orders_' + userId + r'_.*');
-        _logger.debug('Cleared all order cache for user: $userId');
-      } else {
-        // Clear all order cache
-        await _cacheManager.invalidatePattern(r'^orders_.*');
-        _logger.debug('Cleared all order cache');
-      }
-    } catch (e) {
-      _logger.error('Error clearing order cache', e);
-    }
-  }
-
-  /// Refresh order details data
+  /// Refresh order details data (alias for getOrderDetails with backward compatibility)
   Future<OrderDetailsResponse?> refreshOrderDetails({
     required String userId,
     int? userAddressId,
@@ -206,94 +148,7 @@ class OrderDetailsService {
     return await getOrderDetails(
       userId: userId,
       userAddressId: userAddressId,
-      forceRefresh: true,
+      forceRefresh: true, // Not used internally, but kept for API compatibility
     );
-  }
-
-  // Helper method for JSON serialization
-  Map<String, dynamic> _orderDetailToJson(OrderDetail order) {
-    return {
-      'id': order.id,
-      'order_code': order.orderCode,
-      'whmcs_order_id': order.whmcsOrderId,
-      'whmcs_order_number': order.whmcsOrderNumber,
-      'service_name': order.serviceName,
-      'service_group': order.serviceGroup,
-      'invoice_amount': order.invoiceAmount,
-      'invoice_status': order.invoiceStatus,
-      'service_status': order.serviceStatus,
-      'invoice_details': {
-        'subtotal': order.invoiceDetails.subtotal,
-        'tax': order.invoiceDetails.tax,
-        'tax_rate': order.invoiceDetails.taxRate,
-        'tax2': order.invoiceDetails.tax2,
-        'tax_rate2': order.invoiceDetails.taxRate2,
-        'total': order.invoiceDetails.total,
-        'balance': order.invoiceDetails.balance,
-        'amount_paid': order.invoiceDetails.amountPaid,
-        'credit': order.invoiceDetails.credit,
-        'setup_fee': order.invoiceDetails.setupFee != null
-            ? {
-                'amount': order.invoiceDetails.setupFee!.amount,
-                'description': order.invoiceDetails.setupFee!.description,
-                'is_setup_fee_included':
-                    order.invoiceDetails.setupFee!.isSetupFeeIncluded,
-              }
-            : null,
-        'recurring_service': order.invoiceDetails.recurringService != null
-            ? {
-                'amount': order.invoiceDetails.recurringService!.amount,
-                'description':
-                    order.invoiceDetails.recurringService!.description,
-              }
-            : null,
-        'cost_breakdown': order.invoiceDetails.costBreakdown != null
-            ? {
-                'setup_fee': order.invoiceDetails.costBreakdown!.setupFee,
-                'service_cost': order.invoiceDetails.costBreakdown!.serviceCost,
-                'subtotal_before_tax':
-                    order.invoiceDetails.costBreakdown!.subtotalBeforeTax,
-                'tax_amount': order.invoiceDetails.costBreakdown!.taxAmount,
-                'total_amount': order.invoiceDetails.costBreakdown!.totalAmount,
-              }
-            : null,
-      },
-      'billing_cycle': order.billingCycle,
-      'first_payment_amount': order.firstPaymentAmount,
-      'recurring_amount': order.recurringAmount,
-      'next_due_date': order.nextDueDate,
-      'midtrans_data': {
-        'midtrans_order_id': order.midtransData.midtransOrderId,
-        'midtrans_token': order.midtransData.midtransToken,
-        'midtrans_redirect_url': order.midtransData.midtransRedirectUrl,
-        'midtrans_client_key': order.midtransData.midtransClientKey,
-        'midtrans_merchant_base_url':
-            order.midtransData.midtransMerchantBaseUrl,
-        'payment_method': order.midtransData.paymentMethod,
-        'payment_gateway_name': order.midtransData.paymentGatewayName,
-      },
-      'product_data': {
-        'product_id': order.productData.productId,
-        'product_name': order.productData.productName,
-        'product_price': order.productData.productPrice,
-        'product_detail': order.productData.productDetail,
-        'subsplan_id': order.productData.subsplanId,
-        'subsplan_name': order.productData.subsplanName,
-      },
-      'status_data': {
-        'order_status': order.statusData.orderStatus,
-        'payment_deadline': order.statusData.paymentDeadline,
-        'is_paid': order.statusData.isPaid,
-      },
-      'address_details': {
-        'address_id': order.addressDetails.addressId,
-        'address': order.addressDetails.address,
-        'area_name': order.addressDetails.areaName,
-        'city_name': order.addressDetails.cityName,
-        'state_name': order.addressDetails.stateName,
-      },
-      'custom_fields': order.customFields,
-      'created_at': order.createdAt,
-    };
   }
 }

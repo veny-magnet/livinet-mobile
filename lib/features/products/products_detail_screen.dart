@@ -48,15 +48,17 @@ class _ProductsDetailScreenState extends State<ProductsDetailScreen> {
     });
 
     try {
-      // Load user profile to get userId
-      await _loadUserProfile();
+      // Load all data in parallel to avoid duplicate requests
+      await Future.wait([
+        _loadUserProfile(),
+        if (widget.product != null) _loadProductDetail(widget.product!.pid),
+      ]);
 
-      // Load location from address service
-      await _loadLocation();
-
-      // Load product detail if we have product data
-      if (widget.product != null) {
-        await _loadProductDetail(widget.product!.pid);
+      // After userId is available, load location
+      if (userId.isNotEmpty) {
+        await _loadLocation();
+      } else {
+        locationText = widget.location ?? 'Location not available';
       }
 
       setState(() {
@@ -76,21 +78,18 @@ class _ProductsDetailScreenState extends State<ProductsDetailScreen> {
 
       if (result['success'] == true && result['data'] != null) {
         final data = result['data'];
-        setState(() {
-          userId = data.userId ?? '';
-        });
+        // Don't call setState here - will be called once in _loadData
+        userId = data.userId ?? '';
       }
     } catch (e) {
-      print('Error loading user profile: $e');
+      // Silently handle error
     }
   }
 
   Future<void> _loadLocation() async {
     try {
       if (userId.isEmpty) {
-        setState(() {
-          locationText = widget.location ?? 'Location not available';
-        });
+        locationText = widget.location ?? 'Location not available';
         return;
       }
 
@@ -100,24 +99,17 @@ class _ProductsDetailScreenState extends State<ProductsDetailScreen> {
         final List<UserAddress> addresses = result['data'] as List<UserAddress>;
         if (addresses.isNotEmpty) {
           final address = addresses.first;
-          setState(() {
-            locationText =
-                'Available in ${address.areaName}, ${address.cityName}, ${address.stateName}';
-          });
+          // Don't call setState here - will be called once in _loadData
+          locationText =
+              'Available in ${address.areaName}, ${address.cityName}, ${address.stateName}';
         } else {
-          setState(() {
-            locationText = widget.location ?? 'Location not available';
-          });
+          locationText = widget.location ?? 'Location not available';
         }
       } else {
-        setState(() {
-          locationText = widget.location ?? 'Location not available';
-        });
+        locationText = widget.location ?? 'Location not available';
       }
     } catch (e) {
-      setState(() {
-        locationText = widget.location ?? 'Location not available';
-      });
+      locationText = widget.location ?? 'Location not available';
     }
   }
 
@@ -128,12 +120,11 @@ class _ProductsDetailScreenState extends State<ProductsDetailScreen> {
       );
 
       if (result['success'] == true && result['data'] != null) {
-        setState(() {
-          productDetail = result['data'] as ProductDetail;
-        });
+        // Don't call setState here - will be called once in _loadData
+        productDetail = result['data'] as ProductDetail;
       }
     } catch (e) {
-      print('Error loading product detail: $e');
+      // Silently handle error
     }
   }
 

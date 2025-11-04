@@ -1,7 +1,6 @@
 import '../services/base_api_service.dart';
 import 'app_logger.dart';
-import '../cache/cache_manager.dart';
-import '../cache/cache.dart';
+// Cache imports removed - no longer needed
 
 class TicketService {
   static final TicketService _instance = TicketService._internal();
@@ -11,12 +10,8 @@ class TicketService {
 
   final BaseApiService _apiService = BaseApiService();
   final _logger = AppLogger.instance;
-  final _cacheManager = CacheManager.instance;
 
-  static const String CACHE_VERSION = '1.0.0';
-
-  /// Get ticket history for a user
-  /// Cache: networkFirst strategy (tickets can have new replies)
+  /// Get ticket history for a user - NO CACHE
   Future<Map<String, dynamic>> getTicketHistory({
     required String userId,
     String? userAddressId,
@@ -27,70 +22,34 @@ class TicketService {
         'Fetching ticket history for userId: $userId, userAddressId: $userAddressId',
       );
 
-      final cacheKey = 'tickets_${userId}_${userAddressId ?? "all"}';
-
-      // Define cache configuration: 5 min fresh, 30 min stale
-      // Use networkFirst to always try API but fall back to cache if offline
-      final cacheConfig = CacheConfig(
-        maxAge: const Duration(minutes: 5),
-        staleAge: const Duration(minutes: 30),
-        strategy: CacheStrategy.networkFirst,
-        version: CACHE_VERSION,
-      );
-
       final queryParams = <String, String>{'user_id': userId};
 
       if (userAddressId != null && userAddressId.isNotEmpty) {
         queryParams['user_address_id'] = userAddressId;
       }
 
-      // Try network first
-      if (!forceRefresh) {
-        try {
-          final response = await _apiService.get<Map<String, dynamic>>(
-            '/get/tickethistory',
-            queryParams: queryParams,
-            fromJson: (json) => json as Map<String, dynamic>,
-          );
-
-          _logger.debug(
-            'Raw API response - success: ${response.success}, message: ${response.message}',
-          );
-
-          if (response.success && response.data != null) {
-            Map<String, dynamic> responseData;
-            if (response.data is Map<String, dynamic>) {
-              responseData = response.data as Map<String, dynamic>;
-            } else {
-              responseData = {'data': response.data};
-            }
-
-            // Store in cache
-            await _cacheManager.set(cacheKey, responseData, cacheConfig);
-
-            return {
-              'success': true,
-              'message': response.message,
-              'data': responseData,
-            };
-          }
-        } catch (e) {
-          _logger.warning('Network request failed, trying cache: $e');
-        }
-      }
-
-      // Fall back to cache if network failed
-      final cached = await _cacheManager.get<Map<String, dynamic>>(
-        cacheKey,
-        cacheConfig,
-        (json) => json,
+      // Fetch from API
+      final response = await _apiService.get<Map<String, dynamic>>(
+        '/get/tickethistory',
+        queryParams: queryParams,
+        fromJson: (json) => json as Map<String, dynamic>,
       );
 
-      if (cached != null) {
+      _logger.debug(
+        'Raw API response - success: ${response.success}, message: ${response.message}',
+      );
+
+      if (response.success && response.data != null) {
+        Map<String, dynamic> responseData;
+        if (response.data is Map<String, dynamic>) {
+          responseData = response.data as Map<String, dynamic>;
+        } else {
+          responseData = {'data': response.data};
+        }
         return {
           'success': true,
-          'message': 'Ticket history fetched from cache',
-          'data': cached.data,
+          'message': response.message,
+          'data': responseData,
         };
       }
 
@@ -200,9 +159,6 @@ class TicketService {
       _logger.debug('Open ticket response data: ${response.data}');
 
       if (response.success) {
-        // Clear ticket cache after opening new ticket
-        await clearCache(userId: userId, userAddressId: userAddressId);
-
         return {
           'success': true,
           'message': response.message,
@@ -242,11 +198,6 @@ class TicketService {
       _logger.debug('Reply ticket response: ${response.data}');
 
       if (response.success) {
-        // Clear ticket cache after reply
-        if (userId != null) {
-          await clearCache(userId: userId, userAddressId: userAddressId);
-        }
-
         return {
           'success': true,
           'message': response.message,
@@ -262,23 +213,6 @@ class TicketService {
         'message': 'Failed to reply to ticket: $e',
         'data': null,
       };
-    }
-  }
-
-  /// Clear ticket cache
-  Future<void> clearCache({String? userId, String? userAddressId}) async {
-    try {
-      if (userId != null) {
-        final addressPart = userAddressId ?? 'all';
-        final cacheKey = 'tickets_${userId}_$addressPart';
-        await _cacheManager.invalidate(cacheKey);
-        _logger.debug('Cleared ticket cache for: $cacheKey');
-      } else {
-        await _cacheManager.invalidatePattern(r'^tickets_.*');
-        _logger.debug('Cleared all ticket cache');
-      }
-    } catch (e) {
-      _logger.error('Error clearing ticket cache', e);
     }
   }
 
@@ -419,7 +353,6 @@ class TicketService {
     }
   }
 
-  /// Get status display text
   String getStatusDisplay(String status) {
     switch (status.toLowerCase()) {
       case 'open':

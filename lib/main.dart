@@ -10,7 +10,8 @@ import 'core/config/app_config.dart';
 import 'core/services/token_refresh_service.dart';
 import 'core/services/app_logger.dart';
 import 'core/monitoring/monitoring_service.dart';
-import 'core/services/push_notification_service.dart';
+import 'core/services/session_manager.dart';
+import 'core/widgets/user_interaction_tracker.dart';
 
 void main() async {
   await runZonedGuarded(
@@ -34,10 +35,6 @@ void main() async {
             FirebaseCrashlytics.instance.recordFlutterFatalError;
         AppLogger.instance.info('Crashlytics enabled');
       }
-
-      // Initialize Push Notification Service
-      await PushNotificationService.instance.initialize();
-      AppLogger.instance.info('Push Notification service initialized');
 
       // Initialize FCM service (legacy - consider deprecating)
       await FcmService.initialize();
@@ -69,16 +66,62 @@ void main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  final SessionManager _sessionManager = SessionManager.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _sessionManager.cleanup();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    // Cache sync removed - no longer needed
+    if (state == AppLifecycleState.resumed) {
+      // Check session validity when app resumes
+      _checkSessionOnResume();
+    }
+  }
+
+  Future<void> _checkSessionOnResume() async {
+    final isValid = await _sessionManager.isSessionValid();
+    if (!isValid) {
+      // Session expired while app was in background
+      _sessionManager.logout();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'Livinet',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      routerConfig: AppRouter.router,
+    // Set context for session manager dialogs
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _sessionManager.setContext(context);
+    });
+
+    return UserInteractionTracker(
+      child: MaterialApp.router(
+        title: 'Livinet',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        routerConfig: AppRouter.router,
+      ),
     );
   }
 }
