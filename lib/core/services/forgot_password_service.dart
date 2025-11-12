@@ -27,6 +27,12 @@ class ForgotPasswordService {
           'data': responseData['data'],
           'message': responseData['message'],
         };
+      } else if (response.statusCode == 404) {
+        return {
+          'success': false,
+          'message': 'Invalid email address',
+          'data': null,
+        };
       } else {
         return {
           'success': false,

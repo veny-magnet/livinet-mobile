@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'dart:ui';
 import '../models/bottom_nav_model.dart';
 
 class AppBottomNavigation extends StatelessWidget {
@@ -11,20 +12,30 @@ class AppBottomNavigation extends StatelessWidget {
   Widget build(BuildContext context) {
     final navItems = BottomNavModel.getNavigationItems();
 
-    return Container(
-      decoration: BoxDecoration(color: Colors.white.withOpacity(0.70)),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: navItems.map((item) {
-              final isActive = currentRoute == item.route;
-              return _BottomNavItem(
-                item: item.copyWith(isActive: isActive),
-                onTap: () => _handleNavigation(context, item.route),
-              );
-            }).toList(),
+    return ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.7),
+            border: Border(
+              top: BorderSide(color: Colors.white.withOpacity(0.2), width: 1),
+            ),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: navItems.map((item) {
+                  final isActive = currentRoute == item.route;
+                  return _BottomNavItem(
+                    item: item.copyWith(isActive: isActive),
+                    onTap: () => _handleNavigation(context, item.route),
+                  );
+                }).toList(),
+              ),
+            ),
           ),
         ),
       ),

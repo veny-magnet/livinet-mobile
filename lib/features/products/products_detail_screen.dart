@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/services/product_service.dart';
 import '../../core/services/product_detail_service.dart';
 import '../../core/services/address_service.dart';
 import '../../core/services/user_profile_service.dart';
 import '../../core/widgets/order_dialog.dart';
+import '../../core/models/order_models.dart';
 
 class ProductsDetailScreen extends StatefulWidget {
   final String? title;
@@ -131,7 +133,117 @@ class _ProductsDetailScreenState extends State<ProductsDetailScreen> {
   void _showOrderDialog() {
     showDialog(
       context: context,
-      builder: (context) => OrderDialog(product: widget.product!),
+      builder: (context) => OrderDialog(
+        product: widget.product!,
+        onOrderSuccess: _showOrderSuccessDialog,
+      ),
+    );
+  }
+
+  void _showOrderSuccessDialog(OrderResponse orderResponse) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return WillPopScope(
+          onWillPop: () async => false,
+          child: Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4CB04C).withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check_circle,
+                      size: 40,
+                      color: Color(0xFF4CB04C),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Order Successful!',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Open Sans',
+                      color: Colors.black87,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Your order for ${widget.product!.name} has been placed successfully.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'Open Sans',
+                      color: Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Order ID: ${orderResponse.midtransOrderId}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'Open Sans',
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF4CB04C),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'A new bill has been generated and added to your account.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'Open Sans',
+                      color: Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop(); // Close dialog
+                        context.go('/home', extra: {'shouldRefresh': true});
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4CB04C),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'OK',
+                        style: TextStyle(
+                          fontFamily: 'Open Sans',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -222,7 +334,7 @@ class _ProductsDetailScreenState extends State<ProductsDetailScreen> {
           // Content
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

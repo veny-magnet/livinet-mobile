@@ -43,6 +43,16 @@ class AuthService {
 
       Map<String, dynamic> responseData = jsonDecode(response.body);
 
+      // Handle 404 Not Found specifically (invalid email or password)
+      if (response.statusCode == 404) {
+        _logger.warning('Login failed: 404 Not Found - Invalid credentials');
+        return {
+          'success': false,
+          'message': 'Invalid email or password',
+          'data': null,
+        };
+      }
+
       if (response.statusCode == 200 && responseData['success'] == true) {
         // Save token and user data
         await _saveUserSession(responseData['data']);

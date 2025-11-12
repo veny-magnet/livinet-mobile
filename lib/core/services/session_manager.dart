@@ -11,10 +11,12 @@ class SessionManager with WidgetsBindingObserver {
 
   static const String _sessionKey = 'session_timestamp';
   static const String _lastActivityKey = 'last_activity';
-  static const Duration sessionDuration = Duration(minutes: 5);
+  static const Duration sessionDuration = Duration(
+    days: 7,
+  ); // Session valid for 7 days
   static const Duration inactivityTimeout = Duration(
-    minutes: 3,
-  ); // Auto logout after 3 minutes inactivity
+    days: 7,
+  ); // Auto logout after 7 days of inactivity
 
   Timer? _sessionTimer;
   Timer? _inactivityTimer;

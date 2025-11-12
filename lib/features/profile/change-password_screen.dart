@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../core/services/password_reset_service.dart';
 import '../../core/services/profile_update_service.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_text_input.dart' as custom_widgets;
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({Key? key}) : super(key: key);
@@ -219,10 +220,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 actions: [
                   TextButton(
                     onPressed: () {
-                      Navigator.of(context).pop(); // Close dialog
-                      Navigator.of(
-                        context,
-                      ).pop(); // Close change password screen
+                      Navigator.of(context).pop();
+                      Navigator.of(context).pop();
                     },
                     child: const Text(
                       'OK',
@@ -292,468 +291,102 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF4CB04C), Color(0xFFF8D86E)],
-          ),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
         ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Custom AppBar with Gradient Header Style
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(
-                        Icons.arrow_back_ios,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                      splashRadius: 24,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Change Password',
-                      style: TextStyle(
-                        fontFamily: 'Open Sans',
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Main Content
-              Expanded(
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(24),
-                      topRight: Radius.circular(24),
-                    ),
-                  ),
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Info Banner
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.blue[50],
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.blue[200]!),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Icon(
-                                  Icons.info_outline,
-                                  color: Colors.blue[700],
-                                  size: 24,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    'Enter your current password and choose a new secure password.',
-                                    style: TextStyle(
-                                      fontFamily: 'Open Sans',
-                                      fontSize: 13,
-                                      color: Colors.blue[900],
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-
-                          // Current Password
-                          const Text(
-                            'Current Password',
-                            style: TextStyle(
-                              fontFamily: 'Open Sans',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF2D3748),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: _currentPasswordController,
-                            obscureText: _obscureCurrentPassword,
-                            validator: _validateCurrentPassword,
-                            style: const TextStyle(
-                              fontFamily: 'Open Sans',
-                              fontSize: 14,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: 'Enter your current password',
-                              hintStyle: TextStyle(
-                                fontFamily: 'Open Sans',
-                                color: Colors.grey[400],
-                              ),
-                              prefixIcon: const Icon(
-                                Icons.lock_outline,
-                                color: Color(0xFF4CB04C),
-                                size: 20,
-                              ),
-                              suffixIcon: IconButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _obscureCurrentPassword =
-                                        !_obscureCurrentPassword;
-                                  });
-                                },
-                                icon: Icon(
-                                  _obscureCurrentPassword
-                                      ? Icons.visibility_off
-                                      : Icons.visibility,
-                                  color: Colors.grey[600],
-                                  size: 20,
-                                ),
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: Colors.grey[300]!,
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: Colors.grey[300]!,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFF4CB04C),
-                                  width: 2,
-                                ),
-                              ),
-                              errorBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Colors.red),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-
-                          // New Password
-                          const Text(
-                            'New Password',
-                            style: TextStyle(
-                              fontFamily: 'Open Sans',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF2D3748),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: _newPasswordController,
-                            obscureText: _obscureNewPassword,
-                            validator: _validateNewPassword,
-                            style: const TextStyle(
-                              fontFamily: 'Open Sans',
-                              fontSize: 14,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: 'Enter your new password',
-                              hintStyle: TextStyle(
-                                fontFamily: 'Open Sans',
-                                color: Colors.grey[400],
-                              ),
-                              prefixIcon: const Icon(
-                                Icons.lock,
-                                color: Color(0xFF4CB04C),
-                                size: 20,
-                              ),
-                              suffixIcon: IconButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _obscureNewPassword = !_obscureNewPassword;
-                                  });
-                                },
-                                icon: Icon(
-                                  _obscureNewPassword
-                                      ? Icons.visibility_off
-                                      : Icons.visibility,
-                                  color: Colors.grey[600],
-                                  size: 20,
-                                ),
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: Colors.grey[300]!,
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: Colors.grey[300]!,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFF4CB04C),
-                                  width: 2,
-                                ),
-                              ),
-                              errorBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Colors.red),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
-                              ),
-                            ),
-                          ),
-
-                          // Password Strength Indicator
-                          if (_newPasswordController.text.isNotEmpty) ...[
-                            const SizedBox(height: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: LinearProgressIndicator(
-                                        value: _passwordStrength,
-                                        backgroundColor: Colors.grey[300],
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                              _passwordStrengthColor,
-                                            ),
-                                        minHeight: 4,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      _passwordStrengthText,
-                                      style: TextStyle(
-                                        fontFamily: 'Open Sans',
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: _passwordStrengthColor,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Password must be at least 8 characters with a combination of uppercase, lowercase, numbers, and symbols',
-                                  style: TextStyle(
-                                    fontFamily: 'Open Sans',
-                                    fontSize: 11,
-                                    color: Colors.grey[600],
-                                    height: 1.3,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                          const SizedBox(height: 24),
-
-                          // Confirm Password
-                          const Text(
-                            'Confirm New Password',
-                            style: TextStyle(
-                              fontFamily: 'Open Sans',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF2D3748),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: _confirmPasswordController,
-                            obscureText: _obscureConfirmPassword,
-                            validator: _validateConfirmPassword,
-                            style: const TextStyle(
-                              fontFamily: 'Open Sans',
-                              fontSize: 14,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: 'Confirm your new password',
-                              hintStyle: TextStyle(
-                                fontFamily: 'Open Sans',
-                                color: Colors.grey[400],
-                              ),
-                              prefixIcon: const Icon(
-                                Icons.lock_clock,
-                                color: Color(0xFF4CB04C),
-                                size: 20,
-                              ),
-                              suffixIcon: IconButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _obscureConfirmPassword =
-                                        !_obscureConfirmPassword;
-                                  });
-                                },
-                                icon: Icon(
-                                  _obscureConfirmPassword
-                                      ? Icons.visibility_off
-                                      : Icons.visibility,
-                                  color: Colors.grey[600],
-                                  size: 20,
-                                ),
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: Colors.grey[300]!,
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: Colors.grey[300]!,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFF4CB04C),
-                                  width: 2,
-                                ),
-                              ),
-                              errorBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Colors.red),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 32),
-
-                          // Security Tips
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF4CB04C).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFF4CB04C).withOpacity(0.3),
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Row(
-                                  children: [
-                                    Icon(
-                                      Icons.security,
-                                      color: Color(0xFF4CB04C),
-                                      size: 20,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Security Tips',
-                                      style: TextStyle(
-                                        fontFamily: 'Open Sans',
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF4CB04C),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  '• Use a combination of uppercase and lowercase letters\n'
-                                  '• Include numbers and special symbols\n'
-                                  '• Avoid personal information (name, date of birth)\n'
-                                  '• Don\'t use the same password elsewhere',
-                                  style: TextStyle(
-                                    fontFamily: 'Open Sans',
-                                    fontSize: 12,
-                                    color: Colors.grey[700],
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(
-                            height: 100,
-                          ), // Space for bottom button
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+        titleSpacing: 0,
+        title: const Text(
+          'Change Password',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.black,
+            fontFamily: 'Open Sans',
           ),
         ),
       ),
-
-      // Bottom Button
-      bottomNavigationBar: Container(
-        color: Colors.white,
-        padding: const EdgeInsets.all(24),
-        child: SafeArea(
-          child: SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: _isLoading ? null : _changePassword,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4CB04C),
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.grey[300],
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              // Current Password
+              custom_widgets.TextInput(
+                icon: Icons.lock_outline,
+                hintText: "Current Password",
+                controller: _currentPasswordController,
+                obscureText: _obscureCurrentPassword,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscureCurrentPassword
+                        ? Icons.visibility_off
+                        : Icons.visibility,
+                    color: const Color(0xFFA5A9A9),
+                  ),
+                  onPressed: () {
+                    setState(
+                      () => _obscureCurrentPassword = !_obscureCurrentPassword,
+                    );
+                  },
                 ),
-                elevation: 0,
               ),
-              child: _isLoading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Text(
-                      'Change Password',
-                      style: TextStyle(
-                        fontFamily: 'Open Sans',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-            ),
+              const SizedBox(height: 16),
+
+              // New Password
+              custom_widgets.TextInput(
+                icon: Icons.lock_outline,
+                hintText: "New Password",
+                controller: _newPasswordController,
+                obscureText: _obscureNewPassword,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscureNewPassword
+                        ? Icons.visibility_off
+                        : Icons.visibility,
+                    color: const Color(0xFFA5A9A9),
+                  ),
+                  onPressed: () {
+                    setState(() => _obscureNewPassword = !_obscureNewPassword);
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Confirm Password
+              custom_widgets.TextInput(
+                icon: Icons.lock_outline,
+                hintText: "Confirm New Password",
+                controller: _confirmPasswordController,
+                obscureText: _obscureConfirmPassword,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscureConfirmPassword
+                        ? Icons.visibility_off
+                        : Icons.visibility,
+                    color: const Color(0xFFA5A9A9),
+                  ),
+                  onPressed: () {
+                    setState(
+                      () => _obscureConfirmPassword = !_obscureConfirmPassword,
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 30),
+
+              // Change Password Button
+              AppButton(
+                text: _isLoading ? 'Changing...' : 'Change Password',
+                onPressed: _isLoading ? null : _changePassword,
+                isPrimary: true,
+              ),
+            ],
           ),
         ),
       ),

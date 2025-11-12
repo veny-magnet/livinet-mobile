@@ -1,7 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../core/widgets/app_bottom_navigation.dart';
-import '../../core/widgets/address_selector.dart';
 import '../../core/widgets/bill_card.dart';
 import '../../core/widgets/custom_gradient_header.dart';
 import '../../core/widgets/not_verified_widget.dart';
@@ -12,6 +11,7 @@ import 'bill_detail_screen.dart';
 import '../../core/services/address_service.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/order_details_service.dart';
+import '../../core/services/address_manager.dart';
 import '../../core/models/bill_models.dart';
 import '../../core/models/order_detail_models.dart' as order_detail;
 
@@ -33,10 +33,55 @@ class _PayScreenState extends State<PayScreen> {
   int? selectedAddressId;
   String currentPlanName = '';
 
+  DateTime? _lastLoadTime;
+  static const Duration _cacheDuration = Duration(minutes: 5);
+  int? _lastLoadedAddressId;
+
   @override
   void initState() {
     super.initState();
     _loadData();
+    // Listen to address changes from AddressManager
+    AddressManager.instance.addListener(_onAddressChanged);
+  }
+
+  @override
+  void dispose() {
+    // Remove listener when screen is disposed
+    AddressManager.instance.removeListener(_onAddressChanged);
+    super.dispose();
+  }
+
+  void _onAddressChanged(UserAddress? address) {
+    // When address changes, reload bill history for the new address
+    if (mounted && address != null) {
+      // Use deduplication to prevent duplicate API calls
+      if (_shouldReloadData(address.addressId)) {
+        _loadBillHistoryForAddress(address.addressId);
+      }
+    }
+  }
+
+  bool _shouldReloadData(int? addressId) {
+    // Only reload if address is different OR cache expired
+    if (_lastLoadedAddressId != addressId) {
+      _lastLoadedAddressId = addressId;
+      _lastLoadTime = DateTime.now();
+      return true;
+    }
+
+    if (_lastLoadTime == null) {
+      _lastLoadTime = DateTime.now();
+      return true;
+    }
+
+    final timeSinceLoad = DateTime.now().difference(_lastLoadTime!);
+    if (timeSinceLoad > _cacheDuration) {
+      _lastLoadTime = DateTime.now();
+      return true;
+    }
+
+    return false;
   }
 
   Future<void> _loadData() async {
@@ -81,9 +126,13 @@ class _PayScreenState extends State<PayScreen> {
 
       if (result['success'] == true && result['data'] != null) {
         final data = result['data'];
-        // Don't call setState here - will be called once in _loadData
         status = data.status ?? '';
         userId = data.userId ?? '';
+
+        // Load default address from AddressManager if needed
+        if (status == 'verified' && userId.isNotEmpty) {
+          await AddressManager.instance.loadDefaultAddress(userId);
+        }
       } else {
         status = '';
         userId = '';
@@ -101,55 +150,49 @@ class _PayScreenState extends State<PayScreen> {
         return;
       }
 
-      final addressResult = await AddressService.instance.getUserAddresses(
-        userId,
+      // Use AddressManager as single source of truth
+      final addressId = AddressManager.instance.selectedAddressId;
+
+      if (addressId == null) {
+        errorMessage = 'No address selected';
+        return;
+      }
+
+      // Load OrderDetails for BillCard
+      final orderDetailsService = OrderDetailsService.instance;
+      final orderDetailsResponse = await orderDetailsService.getOrderDetails(
+        userId: userId,
+        userAddressId: addressId,
       );
 
-      if (addressResult['success'] == true && addressResult['data'] != null) {
-        final List<UserAddress> addresses =
-            addressResult['data'] as List<UserAddress>;
-        if (addresses.isNotEmpty) {
-          selectedAddressId = addresses.first.addressId;
-
-          // Load OrderDetails for BillCard only
-          final orderDetailsService = OrderDetailsService.instance;
-          final orderDetailsResponse = await orderDetailsService
-              .getOrderDetails(
-                userId: userId,
-                userAddressId: selectedAddressId!,
-              );
-
-          if (orderDetailsResponse != null &&
-              orderDetailsResponse.orders.isNotEmpty) {
-            // Don't call setState here - will be called once in _loadData
-            orderDetailsData = orderDetailsResponse;
-            currentOrderDetail = orderDetailsResponse.orders.first;
-            await _loadCurrentPlanName();
-          } else {
-            orderDetailsData = null;
-            currentOrderDetail = null;
-          }
-
-          // Load BillHistory for Payment History section
-          final billRequest = BillHistoryRequest(
-            userId: userId,
-            userAddressId: selectedAddressId!,
-          );
-
-          final result = await BillService.instance.getBillHistory(billRequest);
-
-          if (result['success'] == true && result['data'] != null) {
-            // Don't call setState here - will be called once in _loadData
-            billHistory = result['data'] as List<BillHistory>;
-          } else {
-            billHistory = [];
-          }
-        } else {
-          errorMessage = 'No address found';
-        }
+      if (orderDetailsResponse != null &&
+          orderDetailsResponse.orders.isNotEmpty) {
+        orderDetailsData = orderDetailsResponse;
+        currentOrderDetail = orderDetailsResponse.orders.first;
+        await _loadCurrentPlanName();
       } else {
-        errorMessage = 'Failed to load addresses';
+        orderDetailsData = null;
+        currentOrderDetail = null;
       }
+
+      // Load BillHistory for Payment History section
+      final billRequest = BillHistoryRequest(
+        userId: userId,
+        userAddressId: addressId,
+      );
+
+      final result = await BillService.instance.getBillHistory(billRequest);
+
+      if (result['success'] == true && result['data'] != null) {
+        billHistory = result['data'] as List<BillHistory>;
+      } else {
+        billHistory = [];
+      }
+
+      // Update state with address ID
+      setState(() {
+        selectedAddressId = addressId;
+      });
     } catch (e) {
       errorMessage = 'Error loading data: $e';
     }
@@ -175,6 +218,59 @@ class _PayScreenState extends State<PayScreen> {
     }
   }
 
+  Future<void> _loadBillHistoryForAddress(int addressId) async {
+    try {
+      if (userId.isEmpty) {
+        return;
+      }
+
+      // Load OrderDetails for the new address
+      final orderDetailsResponse = await OrderDetailsService.instance
+          .getOrderDetails(userId: userId, userAddressId: addressId);
+
+      // Load BillHistory for the new address
+      final billRequest = BillHistoryRequest(
+        userId: userId,
+        userAddressId: addressId,
+      );
+
+      final billResult = await BillService.instance.getBillHistory(billRequest);
+
+      // Update state immediately after both API calls complete
+      if (mounted) {
+        setState(() {
+          selectedAddressId = addressId;
+
+          // Update OrderDetails data
+          if (orderDetailsResponse != null &&
+              orderDetailsResponse.orders.isNotEmpty) {
+            orderDetailsData = orderDetailsResponse;
+            currentOrderDetail = orderDetailsResponse.orders.first;
+          } else {
+            orderDetailsData = null;
+            currentOrderDetail = null;
+          }
+
+          // Update BillHistory data
+          if (billResult['success'] == true && billResult['data'] != null) {
+            billHistory = billResult['data'] as List<BillHistory>;
+          } else {
+            billHistory = [];
+          }
+        });
+
+        // Load plan name after state update
+        await _loadCurrentPlanName();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          errorMessage = 'Error loading bill history: $e';
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -196,16 +292,8 @@ class _PayScreenState extends State<PayScreen> {
       body: Column(
         children: [
           CustomGradientHeader(
-            title: 'Pay',
+            title: 'Transaction',
             children: [
-              AddressSelector(
-                userId: userId.isNotEmpty ? userId : '',
-                defaultAddress: '',
-                onTap: () {
-                  // Handle address selection
-                },
-              ),
-              const SizedBox(height: 10),
               // Show different states based on OrderDetails loading
               isLoading
                   ? Container(

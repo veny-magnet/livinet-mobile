@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../core/widgets/form_components.dart';
+import '../../core/widgets/app_text_input.dart';
+import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_bottom_navigation.dart';
 import '../../core/services/ticket_service.dart';
 import '../../core/services/auth_service.dart';
@@ -170,26 +171,22 @@ class _MakeTicketScreenState extends State<MakeTicketScreen> {
           children: [
             const SizedBox(height: 8),
 
-            CustomTextField(
+            TextInput(
+              icon: Icons.filter_list_rounded,
               hintText: 'Title',
               controller: _titleController,
-              isRequired: true,
-              prefixIcon: Icons.filter_list_rounded,
             ),
 
-            CustomTextField(
-              hintText: 'Description',
-              controller: _descriptionController,
-              isRequired: true,
-              maxLines: 17,
-            ),
+            const SizedBox(height: 16),
+
+            TextInput(controller: _descriptionController, maxLines: 17),
 
             const SizedBox(height: 18),
 
-            CustomButton(
+            AppButton(
               text: 'Submit',
-              onPressed: _submitTicket,
-              isLoading: _isLoading,
+              onPressed: _isLoading ? null : _submitTicket,
+              isPrimary: true,
             ),
 
             const SizedBox(height: 32),

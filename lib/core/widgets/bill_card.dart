@@ -567,15 +567,17 @@ class _BillCardState extends State<BillCard> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.05),
+                        color: widget.status.toLowerCase() == 'paid'
+                            ? const Color(0xFF4CB04C)
+                            : Colors.red,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         widget.status.toUpperCase(),
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
-                          color: Colors.black.withOpacity(0.7),
+                          color: Colors.white,
                           fontFamily: 'Open Sans',
                           letterSpacing: 0.5,
                         ),

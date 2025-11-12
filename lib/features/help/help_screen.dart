@@ -95,48 +95,38 @@ class HelpScreen extends StatelessWidget {
                     // Make Ticket Button
                     Align(
                       alignment: Alignment.centerRight,
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 24),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
+                      child: TextButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const TicketListScreen(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(
+                          CupertinoIcons.tickets,
                           color: Colors.green,
-                          borderRadius: BorderRadius.circular(6),
+                          size: 18,
                         ),
-                        child: GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const TicketListScreen(),
-                              ),
-                            );
-                          },
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text(
-                                'Make Ticket',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  fontFamily: 'Open Sans',
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              const Icon(
-                                CupertinoIcons.tickets,
-                                color: Colors.white,
-                                size: 14,
-                              ),
-                            ],
+                        label: const Text(
+                          'Make Ticket',
+                          style: TextStyle(
+                            color: Colors.green,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Open Sans',
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
                           ),
                         ),
                       ),
                     ),
+                    const SizedBox(height: 16),
 
                     // FAQ Section
                     Padding(

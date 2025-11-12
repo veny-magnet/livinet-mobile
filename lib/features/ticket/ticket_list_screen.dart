@@ -131,15 +131,10 @@ class _TicketListScreenState extends State<TicketListScreen>
 
           Align(
             alignment: Alignment.centerRight,
-            child: Container(
-              margin: const EdgeInsets.only(right: 16, top: 4, bottom: 12),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.green,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: GestureDetector(
-                onTap: () {
+            child: Padding(
+              padding: const EdgeInsets.only(right: 16, top: 4, bottom: 12),
+              child: TextButton.icon(
+                onPressed: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -152,25 +147,25 @@ class _TicketListScreenState extends State<TicketListScreen>
                     }
                   });
                 },
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Make Ticket',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'Open Sans',
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    const Icon(
-                      CupertinoIcons.tickets,
-                      color: Colors.white,
-                      size: 14,
-                    ),
-                  ],
+                icon: const Icon(
+                  CupertinoIcons.tickets,
+                  color: Colors.green,
+                  size: 18,
+                ),
+                label: const Text(
+                  'Make Ticket',
+                  style: TextStyle(
+                    color: Colors.green,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Open Sans',
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                 ),
               ),
             ),

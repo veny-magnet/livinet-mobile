@@ -51,7 +51,13 @@ class AppRouter {
       ),
       GoRoute(
         path: '/home',
-        pageBuilder: (context, state) => _fadePage(state, const HomeScreen()),
+        pageBuilder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return _fadePage(
+            state,
+            HomeScreen(shouldRefresh: extra?['shouldRefresh'] ?? false),
+          );
+        },
       ),
       GoRoute(
         path: '/pay',

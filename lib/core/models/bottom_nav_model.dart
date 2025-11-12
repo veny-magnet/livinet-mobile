@@ -31,7 +31,7 @@ class BottomNavModel {
     return [
       const BottomNavModel(label: 'Home', icon: Icons.home, route: '/home'),
       const BottomNavModel(
-        label: 'Pay',
+        label: 'Transaction',
         icon: Icons.account_balance_wallet,
         route: '/pay',
       ),

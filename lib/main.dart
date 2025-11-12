@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'core/theme/app_theme.dart';
@@ -18,12 +19,16 @@ void main() async {
     () async {
       WidgetsFlutterBinding.ensureInitialized();
 
+      // Load environment variables from .env file
+      await dotenv.load(fileName: ".env");
+
       // Initialize environment configuration
       await AppEnvironment.instance.init();
 
       // Initialize logger
       AppLogger.instance.initialize();
       AppLogger.instance.info('App starting...');
+      AppLogger.instance.info('OpenAI API configured from .env');
 
       // Initialize Firebase
       await Firebase.initializeApp();

@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'app_button.dart';
 
 class NoPlanWidget extends StatelessWidget {
   const NoPlanWidget({super.key});
@@ -42,7 +43,7 @@ class NoPlanWidget extends StatelessWidget {
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
-                height: 50,
+                height: 32,
                 child: ElevatedButton(
                   onPressed: () {
                     context.push('/products');

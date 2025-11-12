@@ -3,7 +3,6 @@ import '../models/bill_models.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
-import 'address_manager.dart';
 import '../config/app_config.dart';
 import 'app_logger.dart';
 
@@ -19,16 +18,18 @@ class SubscriptionService {
   final _logger = AppLogger.instance;
 
   /// Get user subscriptions - NO CACHE, always fresh from server
+  /// If [addressId] is provided: returns per-address subscriptions
+  /// If [addressId] is null: returns global user subscriptions (all addresses)
   Future<Map<String, dynamic>> getUserSubscriptions(
     String userId, {
+    int? addressId, // Optional: if provided, get per-address subscriptions
     bool forceRefresh = false, // Keep for backward compatibility
   }) async {
     try {
-      // Get selected address from AddressManager
-      final selectedAddressId = AddressManager.instance.selectedAddressId;
-
+      // Only use provided addressId - NO fallback to AddressManager
+      // This ensures independent calls: with addressId = per-address, without = global
       _logger.debug(
-        'Fetching subscriptions for userId: $userId, addressId: $selectedAddressId',
+        'Fetching subscriptions for userId: $userId, addressId: $addressId (global: ${addressId == null})',
       );
 
       // Make API request - NO CACHE, always fresh
@@ -36,8 +37,8 @@ class SubscriptionService {
         '/get/subscriptions',
         queryParams: {
           'user_id': userId,
-          if (selectedAddressId != null)
-            'user_address_id': selectedAddressId.toString(),
+          if (addressId != null) 'address_id': addressId.toString(),
+          // If addressId is null, parameter is NOT included (global query)
         },
         fromJson: (json) => json as Map<String, dynamic>,
       );
@@ -57,6 +58,15 @@ class SubscriptionService {
         return {'success': false, 'message': response.message, 'data': null};
       }
     } catch (e) {
+      if (e.toString().contains('404')) {
+        _logger.debug('No subscriptions found (404) - this is normal');
+        return {
+          'success': true,
+          'message': 'No subscriptions found',
+          'data': {'subscriptions': []},
+        };
+      }
+
       _logger.error('Exception occurred while getting subscriptions', e);
       return {
         'success': false,
@@ -97,13 +107,13 @@ class SubscriptionService {
   /// Get active subscription - NO CACHE, always fresh from server
   Future<Map<String, dynamic>> getActiveSubscription(
     String userId, {
+    int? addressId,
     bool forceRefresh = false, // Keep for backward compatibility
   }) async {
     try {
-      final selectedAddressId = AddressManager.instance.selectedAddressId;
-
+      // Only use provided addressId - NO fallback
       _logger.debug(
-        'Getting active subscription for userId: $userId, addressId: $selectedAddressId',
+        'Getting active subscription for userId: $userId, addressId: $addressId (global: ${addressId == null})',
       );
 
       // Make API request - NO CACHE, always fresh
@@ -111,8 +121,7 @@ class SubscriptionService {
         '/get/subscriptions',
         queryParams: {
           'user_id': userId,
-          if (selectedAddressId != null)
-            'user_address_id': selectedAddressId.toString(),
+          if (addressId != null) 'address_id': addressId.toString(),
         },
         fromJson: (json) => json as Map<String, dynamic>,
       );

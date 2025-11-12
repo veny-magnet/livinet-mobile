@@ -25,7 +25,7 @@ android {
         applicationId = "com.example.livinet_mobile"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk = 28  // Required by best_ktp_ocr_flutter plugin
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -52,6 +52,9 @@ dependencies {
     
     // Firebase Crashlytics (already in use)
     implementation("com.google.firebase:firebase-crashlytics")
+    
+    // Google ML Kit Text Recognition
+    implementation("com.google.mlkit:text-recognition:16.0.1")
 }
 
 flutter {

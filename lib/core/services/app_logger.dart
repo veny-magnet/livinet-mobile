@@ -1,7 +1,6 @@
 import 'package:logger/logger.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import '../config/app_config.dart';
-import 'package:flutter/foundation.dart';
 
 /// Application-wide logging service
 class AppLogger {
@@ -28,7 +27,6 @@ class AppLogger {
         printEmojis: true,
         printTime: true,
       ),
-      output: _LogOutput(),
     );
 
     _initialized = true;
@@ -201,15 +199,5 @@ class _LogFilter extends LogFilter {
 
     // In development, log everything if enabled
     return config.isLoggingEnabled;
-  }
-}
-
-/// Custom log output
-class _LogOutput extends LogOutput {
-  @override
-  void output(OutputEvent event) {
-    for (var line in event.lines) {
-      // In debug mode, use print
-    }
   }
 }

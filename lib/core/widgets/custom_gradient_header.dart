@@ -29,7 +29,7 @@ class CustomGradientHeader extends StatelessWidget {
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -69,7 +69,7 @@ class CustomGradientHeader extends StatelessWidget {
 
               ...children,
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
             ],
           ),
         ),

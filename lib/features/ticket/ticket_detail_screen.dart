@@ -158,15 +158,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
   Widget _buildTicketDetailContent() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildTicketHeader(),
-          const SizedBox(height: 24),
-          _buildTicketContent(),
-          const SizedBox(height: 24),
           _buildReplies(),
+          const SizedBox(height: 20),
         ],
       ),
     );
@@ -174,77 +171,65 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
   Widget _buildTicketHeader() {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
+      decoration: BoxDecoration(color: Colors.grey.shade50),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              _buildStatusBadge(ticketDetail!['status'] ?? 'Open'),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  ticketDetail!['title'] ?? 'No Title',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                  _ticketService.formatTicketDate(ticketDetail!['date']),
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                    fontFamily: 'Open Sans',
                   ),
                 ),
               ),
-              _buildStatusBadge(ticketDetail!['status'] ?? 'Open'),
             ],
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(
-                Icons.confirmation_number,
-                color: Colors.grey[600],
-                size: 16,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'ID: ${ticketDetail!['tid'] ?? ticketDetail!['ticketid']}',
-                style: TextStyle(color: Colors.grey[600], fontSize: 14),
-              ),
-            ],
+          Text(
+            ticketDetail!['title'] ?? 'No Title',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+              fontFamily: 'Open Sans',
+            ),
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(Icons.calendar_today, color: Colors.grey[600], size: 16),
-              const SizedBox(width: 8),
               Text(
-                'Date: ${_ticketService.formatTicketDate(ticketDetail!['date'])}',
-                style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                'ID: ${ticketDetail!['tid'] ?? ticketDetail!['ticketid']}',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 12,
+                  fontFamily: 'Open Sans',
+                ),
               ),
-            ],
-          ),
-          if (ticketDetail!['priority'] != null) ...[
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.priority_high, color: Colors.grey[600], size: 16),
-                const SizedBox(width: 8),
+              if (ticketDetail!['priority'] != null) ...[
+                Text(
+                  ' • ',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                ),
                 Text(
                   'Priority: ${ticketDetail!['priority']}',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                    fontFamily: 'Open Sans',
+                  ),
                 ),
               ],
-            ),
-          ],
+            ],
+          ),
         ],
       ),
     );
@@ -267,56 +252,85 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: statusColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: statusColor),
+        color: statusColor,
+        borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
         status.toUpperCase(),
-        style: TextStyle(
-          color: statusColor,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          fontFamily: 'Open Sans',
         ),
       ),
     );
   }
 
   Widget _buildTicketContent() {
-    return Container(
+    return Padding(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Description',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
+          // Icon + Name + Date inline
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Icon with circle background
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.person_outline,
+                  color: Colors.grey.shade600,
+                  size: 16,
+                ),
+              ),
+              const SizedBox(width: 10),
+              // Name
+              Expanded(
+                child: Text(
+                  ticketDetail!['name'] ??
+                      ticketDetail!['requestor_name'] ??
+                      'User',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                    fontFamily: 'Open Sans',
+                  ),
+                ),
+              ),
+              // Date
+              Text(
+                _ticketService.formatTicketDate(ticketDetail!['date']),
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 12,
+                  fontFamily: 'Open Sans',
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
-          Text(
-            ticketDetail!['description'] ?? 'No description available',
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.black87,
-              height: 1.5,
+          // Description (indented to align with name)
+          Padding(
+            padding: const EdgeInsets.only(left: 38),
+            child: Text(
+              ticketDetail!['description'] ?? 'No description available',
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.black87,
+                height: 1.6,
+                fontFamily: 'Open Sans',
+              ),
             ),
           ),
         ],
@@ -339,140 +353,109 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     }
 
     if (replyList.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              spreadRadius: 1,
-              blurRadius: 3,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
+      return Padding(
+        padding: const EdgeInsets.all(40),
         child: const Column(
           children: [
             Icon(Icons.chat_bubble_outline, color: Colors.grey, size: 48),
             SizedBox(height: 12),
             Text(
               'No replies yet',
-              style: TextStyle(color: Colors.grey, fontSize: 16),
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 14,
+                fontFamily: 'Open Sans',
+              ),
             ),
           ],
         ),
       );
     }
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Replies',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ...replyList.map((reply) => _buildReplyItem(reply)).toList(),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [...replyList.map((reply) => _buildReplyItem(reply)).toList()],
     );
   }
 
   Widget _buildReplyItem(Map<String, dynamic> reply) {
     final isAdmin = reply['admin']?.toString().isNotEmpty == true;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isAdmin
-            ? Colors.blue.withOpacity(0.05)
-            : Colors.grey.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isAdmin
-              ? Colors.blue.withOpacity(0.2)
-              : Colors.grey.withOpacity(0.2),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                isAdmin ? Icons.admin_panel_settings : Icons.person,
-                color: isAdmin ? Colors.blue : Colors.grey[600],
-                size: 16,
+              // Icon + Name + Date inline
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Icon with circle background
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: isAdmin
+                          ? Colors.blue.shade50
+                          : Colors.grey.shade100,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isAdmin ? Icons.support_agent : Icons.person_outline,
+                      color: isAdmin ? Colors.blue : Colors.grey.shade600,
+                      size: 16,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  // Name
+                  Expanded(
+                    child: Text(
+                      reply['name'] ?? reply['requestor_name'] ?? 'Unknown',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isAdmin ? Colors.blue : Colors.black87,
+                        fontFamily: 'Open Sans',
+                      ),
+                    ),
+                  ),
+                  // Date
+                  Text(
+                    _ticketService.formatTicketDate(reply['date']),
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 12,
+                      fontFamily: 'Open Sans',
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Expanded(
+              const SizedBox(height: 4),
+              // Message (indented to align with name)
+              Padding(
+                padding: const EdgeInsets.only(left: 38),
                 child: Text(
-                  reply['name'] ?? reply['requestor_name'] ?? 'Unknown',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: isAdmin ? Colors.blue : Colors.black87,
+                  reply['message'] ?? 'No message',
+                  style: const TextStyle(
                     fontSize: 14,
+                    color: Colors.black87,
+                    height: 1.6,
+                    fontFamily: 'Open Sans',
                   ),
                 ),
               ),
-              Text(
-                _ticketService.formatTicketDate(reply['date']),
-                style: TextStyle(color: Colors.grey[600], fontSize: 12),
-              ),
             ],
           ),
-          if (reply['requestor_type'] != null) ...[
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: isAdmin
-                    ? Colors.blue.withOpacity(0.1)
-                    : Colors.grey.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                reply['requestor_type'],
-                style: TextStyle(
-                  color: isAdmin ? Colors.blue : Colors.grey[700],
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-          const SizedBox(height: 12),
-          Text(
-            reply['message'] ?? 'No message',
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.black87,
-              height: 1.4,
-            ),
-          ),
-        ],
-      ),
+        ),
+        // Divider between replies
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Divider(color: Colors.grey.shade300, height: 1),
+        ),
+      ],
     );
   }
 }

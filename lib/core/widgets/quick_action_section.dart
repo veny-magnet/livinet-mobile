@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../features/products/products_screen.dart';
-import '../../features/help/help_screen.dart';
-import '../../features/ticket/ticket_list_screen.dart';
-import '../../features/pay/pay_screen.dart';
+import 'package:go_router/go_router.dart';
 
 class QuickActionSection extends StatelessWidget {
   const QuickActionSection({super.key});
@@ -47,48 +44,28 @@ class QuickActionSection extends StatelessWidget {
                   icon: Icons.account_balance_wallet,
                   label: 'Pay',
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const PayScreen(),
-                      ),
-                    );
+                    context.push('/pay');
                   },
                 ),
                 _buildQuickActionItem(
                   icon: Icons.shopping_bag,
                   label: 'Explore',
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ProductsScreen(),
-                      ),
-                    );
+                    context.push('/products');
                   },
                 ),
                 _buildQuickActionItem(
                   icon: Icons.help,
                   label: 'FAQs',
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const HelpScreen(),
-                      ),
-                    );
+                    context.push('/help');
                   },
                 ),
                 _buildQuickActionItem(
                   icon: Icons.support_agent,
                   label: 'Ask Ticket',
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const TicketListScreen(),
-                      ),
-                    );
+                    context.push('/ticket');
                   },
                 ),
               ],

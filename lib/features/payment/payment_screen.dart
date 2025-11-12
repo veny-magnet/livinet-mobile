@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/models/order_models.dart';
 import '../../core/models/order_detail_models.dart' as order_detail;
-import '../home/home_screen.dart';
 
 // Wrapper class to handle both OrderResponse and OrderDetail
 class PaymentData {
@@ -127,15 +127,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
     super.initState();
   }
 
-  void _navigateToHome() {
-    if (!mounted) return;
-
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const HomeScreen()),
-      (route) => false,
-    );
-  }
-
   void _showMidtransPayment() {
     showDialog(
       context: context,
@@ -144,9 +135,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         snapToken: widget.orderData.midtransToken,
         clientKey: widget.orderData.midtransClientKey,
         isProduction: false, // Set true untuk production
-        onPaymentFinished: (result) {
-          _handlePaymentResult(result);
-        },
+        onPaymentFinished: _handlePaymentResult,
       ),
     );
   }
@@ -154,53 +143,298 @@ class _PaymentScreenState extends State<PaymentScreen> {
   void _handlePaymentResult(Map<String, dynamic> result) {
     final status = result['status'] ?? 'unknown';
 
-    if (status == 'success') {
-      // Payment successful - show dialog
-      _showPaymentDialog(
-        title: 'Payment Successful',
-        message: 'Your payment has been submitted successfully.',
-        isSuccess: true,
-      );
-    } else if (status == 'pending') {
-      // Payment pending
-      _showPaymentDialog(
-        title: 'Payment Pending',
-        message: 'Payment pending. Please complete your payment.',
-        isSuccess: false,
-      );
-    } else if (status == 'error') {
-      // Payment error
-      _showPaymentDialog(
-        title: 'Payment Failed',
-        message: result['message'] ?? 'Payment failed. Please try again.',
-        isSuccess: false,
-      );
-    } else if (status == 'closed') {
-      return;
-    }
+    // Add small delay to ensure Midtrans dialog is fully closed
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+
+      if (status == 'success') {
+        // Payment successful - show success dialog
+        _showPaymentSuccessDialog();
+      } else if (status == 'pending') {
+        // Payment pending - show pending dialog
+        _showPaymentPendingDialog();
+      } else if (status == 'error') {
+        // Payment error - show error dialog
+        _showPaymentErrorDialog(
+          result['message'] ?? 'Payment failed. Please try again.',
+        );
+      } else if (status == 'closed') {
+        // User cancelled - do nothing, stay on payment screen
+        return;
+      }
+    });
   }
 
-  void _showPaymentDialog({
-    required String title,
-    required String message,
-    required bool isSuccess,
-  }) {
+  void _showPaymentSuccessDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop(); // Close dialog
-              _navigateToHome();
-            },
-            child: const Text('Back to Home'),
+      builder: (BuildContext context) {
+        return WillPopScope(
+          onWillPop: () async => false,
+          child: Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4CB04C).withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check_circle,
+                      size: 40,
+                      color: Color(0xFF4CB04C),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Payment Successful!',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Open Sans',
+                      color: Colors.black87,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Your payment has been submitted successfully.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'Open Sans',
+                      color: Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop(); // Close dialog
+                        // Add delay to ensure dialog is fully closed before navigation
+                        Future.delayed(const Duration(milliseconds: 200), () {
+                          if (mounted) {
+                            context.go('/home', extra: {'shouldRefresh': true});
+                          }
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4CB04C),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Back to Home',
+                        style: TextStyle(
+                          fontFamily: 'Open Sans',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ],
-      ),
+        );
+      },
+    );
+  }
+
+  void _showPaymentPendingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return WillPopScope(
+          onWillPop: () async => false,
+          child: Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.pending_outlined,
+                      size: 40,
+                      color: Colors.orange,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Payment Pending',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Open Sans',
+                      color: Colors.black87,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Payment pending. Please complete your payment.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'Open Sans',
+                      color: Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop(); // Close dialog
+                        // Add delay to ensure dialog is fully closed before navigation
+                        Future.delayed(const Duration(milliseconds: 200), () {
+                          if (mounted) {
+                            context.go('/home', extra: {'shouldRefresh': true});
+                          }
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Back to Home',
+                        style: TextStyle(
+                          fontFamily: 'Open Sans',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showPaymentErrorDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return WillPopScope(
+          onWillPop: () async => false,
+          child: Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.error_outline,
+                      size: 40,
+                      color: Colors.red,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Payment Failed',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Open Sans',
+                      color: Colors.black87,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    message,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'Open Sans',
+                      color: Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop(); // Close dialog
+                        // Add delay to ensure dialog is fully closed before navigation
+                        Future.delayed(const Duration(milliseconds: 200), () {
+                          if (mounted) {
+                            context.go('/home', extra: {'shouldRefresh': true});
+                          }
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Back to Home',
+                        style: TextStyle(
+                          fontFamily: 'Open Sans',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -445,7 +679,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(50),
                           ),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 18,
@@ -558,10 +792,10 @@ class _MidtransSnapDialogState extends State<MidtransSnapDialog> {
     // Close dialog
     if (mounted) {
       Navigator.of(context).pop();
-    }
 
-    // Call callback
-    widget.onPaymentFinished(result);
+      // Call callback directly without delay
+      widget.onPaymentFinished(result);
+    }
   }
 
   @override
@@ -626,7 +860,64 @@ class _MidtransSnapDialogState extends State<MidtransSnapDialog> {
                             },
                           );
                         },
-                        onLoadStart: (controller, url) {},
+                        onLoadStart: (controller, url) {
+                          print('WebView Loading: $url');
+                        },
+                        shouldOverrideUrlLoading:
+                            (controller, navigationAction) async {
+                              final url = navigationAction.request.url
+                                  .toString();
+                              print('URL Navigation: $url');
+
+                              // Check if URL is a redirect URL (contains status parameter or is redirect endpoint)
+                              if (url.contains('status=') ||
+                                  url.contains('redirect') ||
+                                  url.contains('/payment-result') ||
+                                  url.contains('/api/payment')) {
+                                print(' Redirect URL detected: $url');
+
+                                try {
+                                  // Extract status from URL
+                                  final uri = Uri.parse(url);
+                                  final status =
+                                      uri.queryParameters['status'] ??
+                                      uri.queryParameters['transaction_status'];
+
+                                  if (status != null) {
+                                    print(
+                                      'Payment status from redirect: $status',
+                                    );
+
+                                    // Map transaction status to our status
+                                    String mappedStatus = status.toLowerCase();
+                                    if (mappedStatus.contains('settlement') ||
+                                        mappedStatus == 'success') {
+                                      _handlePaymentFinished({
+                                        'status': 'success',
+                                      });
+                                    } else if (mappedStatus.contains(
+                                      'pending',
+                                    )) {
+                                      _handlePaymentFinished({
+                                        'status': 'pending',
+                                      });
+                                    } else {
+                                      _handlePaymentFinished({
+                                        'status': 'error',
+                                        'message': 'Payment failed',
+                                      });
+                                    }
+                                    return NavigationActionPolicy
+                                        .CANCEL; // Don't load the redirect URL
+                                  }
+                                } catch (e) {
+                                  print('Error parsing redirect URL: $e');
+                                }
+                              }
+
+                              // Allow other URLs to load normally
+                              return NavigationActionPolicy.ALLOW;
+                            },
                         onLoadStop: (controller, url) {
                           if (mounted) {
                             setState(() {
@@ -634,13 +925,16 @@ class _MidtransSnapDialogState extends State<MidtransSnapDialog> {
                             });
                           }
                         },
-                        onConsoleMessage: (controller, consoleMessage) {},
+                        onConsoleMessage: (controller, consoleMessage) {
+                          print(' WebView Console: ${consoleMessage.message}');
+                        },
                         onLoadError: (controller, url, code, message) {
                           if (mounted) {
                             setState(() {
                               _isLoading = false;
                             });
                           }
+                          print('❌ WebView Error: $message (Code: $code)');
                         },
                       ),
                     ),
@@ -770,9 +1064,17 @@ class _MidtransSnapDialogState extends State<MidtransSnapDialog> {
         return;
       }
       paymentProcessed = true;
+      console.log('Sending payment result:', JSON.stringify(result));
       
       if (window.flutter_inappwebview) {
-        window.flutter_inappwebview.callHandler('PaymentFinish', result);
+        try {
+          window.flutter_inappwebview.callHandler('PaymentFinish', result);
+          console.log('Payment result sent to Flutter');
+        } catch (e) {
+          console.error('Error calling flutter handler:', e);
+        }
+      } else {
+        console.warn('flutter_inappwebview not available');
       }
     }
     
@@ -793,14 +1095,16 @@ class _MidtransSnapDialogState extends State<MidtransSnapDialog> {
             console.log('Payment SUCCESS:', JSON.stringify(result));
             sendPaymentResult({
               status: 'success',
-              result: result
+              result: result,
+              transaction_status: result.transaction_status
             });
           },
           onPending: function(result) {
             console.log('Payment PENDING:', JSON.stringify(result));
             sendPaymentResult({
               status: 'pending',
-              result: result
+              result: result,
+              transaction_status: result.transaction_status
             });
           },
           onError: function(result) {
@@ -813,9 +1117,11 @@ class _MidtransSnapDialogState extends State<MidtransSnapDialog> {
           },
           onClose: function() {
             console.log('Payment popup CLOSED by user');
-            sendPaymentResult({
-              status: 'closed'
-            });
+            if (!paymentProcessed) {
+              sendPaymentResult({
+                status: 'closed'
+              });
+            }
           }
         });
         

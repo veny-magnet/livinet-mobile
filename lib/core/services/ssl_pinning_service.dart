@@ -21,13 +21,6 @@ class SSLPinningService {
     // Example: 'AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99'
   ];
 
-  /// Public key hashes (SHA-256) - Alternative to certificate pinning
-  static const List<String> _publicKeyHashes = [
-    // Add your public key hashes here
-    // Can be extracted from certificate using:
-    // openssl x509 -in certificate.crt -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64
-  ];
-
   /// Get HTTP client with SSL pinning
   http.Client getClient() {
     if (_client != null) {

@@ -1,6 +1,4 @@
 import 'auth_service.dart';
-import 'user_profile_service.dart';
-import 'address_service.dart';
 import '../monitoring/monitoring_service.dart';
 import 'app_logger.dart';
 
@@ -12,7 +10,6 @@ class AppInitializer {
   final _logger = AppLogger.instance;
   bool _isInitialized = false;
 
-  /// Initialize app with optimized loading
   Future<Map<String, dynamic>> initialize() async {
     if (_isInitialized) {
       return {'success': true, 'message': 'Already initialized'};
@@ -21,13 +18,18 @@ class AppInitializer {
     final stopwatch = Stopwatch()..start();
 
     try {
-      final criticalData = await _loadCriticalData();
+      final authValidation = await _validateAuth();
 
-      if (!criticalData['success']) {
-        return criticalData;
+      if (!authValidation['success']) {
+        return authValidation;
       }
 
-      final userId = criticalData['userId'] as String?;
+      final userId = authValidation['userId'] as String?;
+
+      // Set user identifier for monitoring
+      if (userId != null) {
+        await MonitoringService.instance.setUserId(userId);
+      }
 
       _isInitialized = true;
       stopwatch.stop();
@@ -44,7 +46,6 @@ class AppInitializer {
         'success': true,
         'message': 'Initialization successful',
         'userId': userId,
-        'profile': criticalData['profile'],
       };
     } catch (e, stackTrace) {
       stopwatch.stop();
@@ -59,8 +60,8 @@ class AppInitializer {
     }
   }
 
-  /// Load critical data (blocking)
-  Future<Map<String, dynamic>> _loadCriticalData() async {
+  /// Validate authentication only
+  Future<Map<String, dynamic>> _validateAuth() async {
     try {
       final authService = AuthService();
 
@@ -73,36 +74,10 @@ class AppInitializer {
 
       final userId = currentUser['user_id'] as String;
 
-      // Load user profile in parallel with address check
-      final results = await Future.wait([
-        UserProfileService.instance.getCurrentUserProfile(),
-        AddressService.instance.getUserAddresses(userId),
-      ]);
-
-      final profileResult = results[0];
-      final addressResult = results[1];
-
-      if (profileResult['success'] != true) {
-        return {'success': false, 'message': 'Failed to load profile'};
-      }
-
-      // Set user identifier for monitoring
-      await MonitoringService.instance.setUserId(userId);
-
-      // Real-time services disabled (not needed with cache sync)
-      // await _initializeRealtimeServices(userId);
-
-      return {
-        'success': true,
-        'userId': userId,
-        'profile': profileResult['data'],
-        'hasAddress':
-            addressResult['success'] == true &&
-            (addressResult['data'] as List?)?.isNotEmpty == true,
-      };
+      return {'success': true, 'userId': userId};
     } catch (e) {
-      _logger.error('Failed to load critical data', e);
-      return {'success': false, 'message': 'Failed to load user data'};
+      _logger.error('Failed to validate auth', e);
+      return {'success': false, 'message': 'Authentication validation failed'};
     }
   }
 

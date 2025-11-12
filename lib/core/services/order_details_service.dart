@@ -10,7 +10,6 @@ class OrderDetailsService {
   final BaseApiService _apiService;
   final _logger = AppLogger.instance;
 
-  /// Get order details with optional user_address_id filter
   /// NO CACHE - Always fetch fresh data from server
   Future<OrderDetailsResponse?> getOrderDetails({
     required String userId,

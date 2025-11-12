@@ -4,13 +4,16 @@ import '../services/order_service.dart';
 import '../services/product_service.dart';
 import '../services/address_service.dart';
 import '../services/auth_service.dart';
-// BillService removed - no longer needed for cache clearing
-import '../../features/home/home_screen.dart';
 
 class OrderDialog extends StatefulWidget {
   final Product product;
+  final Function(OrderResponse orderResponse) onOrderSuccess;
 
-  const OrderDialog({super.key, required this.product});
+  const OrderDialog({
+    super.key,
+    required this.product,
+    required this.onOrderSuccess,
+  });
 
   @override
   State<OrderDialog> createState() => _OrderDialogState();
@@ -46,13 +49,15 @@ class _OrderDialogState extends State<OrderDialog> {
         throw Exception('User not authenticated');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please login first'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please login first'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        Navigator.of(context).pop();
+      }
     }
   }
 
@@ -69,7 +74,9 @@ class _OrderDialogState extends State<OrderDialog> {
           }
         });
       }
-    } catch (e) {}
+    } catch (e) {
+      // Handle error silently or show message if needed
+    }
   }
 
   Future<void> _submitOrder() async {
@@ -94,14 +101,14 @@ class _OrderDialogState extends State<OrderDialog> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      builder: (loadingContext) => AlertDialog(
         content: Row(
           mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(width: 16),
-            const Text(
-              'Processing your order...',
+          children: const [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text(
+              'Processing your order',
               style: TextStyle(fontFamily: 'Open Sans'),
             ),
           ],
@@ -133,81 +140,38 @@ class _OrderDialogState extends State<OrderDialog> {
       if (result['success'] == true && result['data'] != null) {
         final orderResponse = result['data'] as OrderResponse;
 
-        // Close the order dialog
-        Navigator.of(context).pop();
+        // Close order dialog
+        if (mounted) Navigator.of(context).pop();
 
-        // Show success popup
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.green, size: 28),
-                SizedBox(width: 8),
-                Text(
-                  'Order Successful!',
-                  style: TextStyle(fontFamily: 'Open Sans'),
-                ),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Your order for ${widget.product.name} has been placed successfully.',
-                  style: const TextStyle(fontFamily: 'Open Sans'),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Order ID: ${orderResponse.midtransOrderId}',
-                  style: const TextStyle(
-                    fontFamily: 'Open Sans',
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'A new bill has been generated and added to your account.',
-                  style: TextStyle(fontFamily: 'Open Sans'),
-                ),
-              ],
-            ),
-            actions: [
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop(); // Close success dialog
-                  _navigateToHome();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text(
-                  'Continue',
-                  style: TextStyle(fontFamily: 'Open Sans'),
-                ),
-              ),
-            ],
-          ),
-        );
+        // Call callback to show success dialog in parent screen
+        widget.onOrderSuccess(orderResponse);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Failed to create order'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Failed to create order'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
+      // Close loading dialog if still open
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -247,12 +211,37 @@ class _OrderDialogState extends State<OrderDialog> {
               const SizedBox(height: 8),
               TextFormField(
                 controller: _levelController,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.grey[100],
                   hintText: 'e.g., 2',
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+                  hintStyle: TextStyle(color: Colors.grey[400]),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Color(0xFF4CB04C),
+                      width: 2,
+                    ),
+                  ),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.red, width: 1),
+                  ),
+                  focusedErrorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.red, width: 2),
                   ),
                 ),
                 keyboardType: TextInputType.number,
@@ -278,12 +267,37 @@ class _OrderDialogState extends State<OrderDialog> {
               const SizedBox(height: 8),
               TextFormField(
                 controller: _blockController,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.grey[100],
                   hintText: 'e.g., A',
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+                  hintStyle: TextStyle(color: Colors.grey[400]),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Color(0xFF4CB04C),
+                      width: 2,
+                    ),
+                  ),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.red, width: 1),
+                  ),
+                  focusedErrorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.red, width: 2),
                   ),
                 ),
                 validator: (value) {
@@ -308,12 +322,37 @@ class _OrderDialogState extends State<OrderDialog> {
               const SizedBox(height: 8),
               TextFormField(
                 controller: _unitNumberController,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.grey[100],
                   hintText: 'e.g., 201',
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+                  hintStyle: TextStyle(color: Colors.grey[400]),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Color(0xFF4CB04C),
+                      width: 2,
+                    ),
+                  ),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.red, width: 1),
+                  ),
+                  focusedErrorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.red, width: 2),
                   ),
                 ),
                 validator: (value) {
@@ -356,16 +395,6 @@ class _OrderDialogState extends State<OrderDialog> {
                 ),
         ),
       ],
-    );
-  }
-
-  void _navigateToHome() {
-    // Cache clearing removed - no longer needed without cache system
-
-    // Navigate to home
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const HomeScreen()),
-      (route) => false,
     );
   }
 }

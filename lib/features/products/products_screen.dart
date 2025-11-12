@@ -13,12 +13,8 @@ import '../../core/services/product_service.dart';
 import '../../core/services/subscription_service.dart';
 import '../../core/services/address_manager.dart';
 import '../../core/services/address_service.dart';
-// BillService removed - no longer needed for cache clearing
-import '../../core/services/order_service.dart';
-import '../../core/models/order_models.dart';
 import 'products_detail_screen.dart';
 import 'upgrade_plan_screen.dart';
-import '../home/home_screen.dart';
 
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
@@ -37,34 +33,108 @@ class _ProductsScreenState extends State<ProductsScreen> {
   bool hasSubscription = false;
   String currentPlan = '';
 
+  // Deduplication & caching
+  DateTime? _lastLoadTime;
+  static const Duration _cacheDuration = Duration(minutes: 5);
+  int? _lastLoadedAddressId;
+
   @override
   void initState() {
     super.initState();
     _loadUserProfile();
-
-    // Listen to address changes
     AddressManager.instance.addListener(_onAddressChanged);
   }
 
   @override
   void dispose() {
-    // Remove listener when disposing
     AddressManager.instance.removeListener(_onAddressChanged);
     super.dispose();
   }
 
   void _onAddressChanged(UserAddress? address) {
-    // Cache clearing removed - no longer needed
-    if (status == 'verified' && userId.isNotEmpty) {
+    // When address changes, recheck subscription status for the new address
+    if (status == 'verified' && userId.isNotEmpty && address != null) {
       Future.delayed(const Duration(milliseconds: 100), () {
         if (mounted) {
-          if (hasSubscription) {
-            _loadAddOns(userId, address?.addressId);
-          } else {
-            _loadProducts(userId, address?.addressId);
-          }
+          _recheckSubscriptionForAddress(userId, address.addressId);
         }
       });
+    }
+  }
+
+  bool _shouldReloadData(int? addressId) {
+    // Only reload if address is different OR cache expired
+    if (_lastLoadedAddressId != addressId) {
+      _lastLoadedAddressId = addressId;
+      _lastLoadTime = DateTime.now();
+      return true;
+    }
+
+    if (_lastLoadTime == null) {
+      _lastLoadTime = DateTime.now();
+      return true;
+    }
+
+    final timeSinceLoad = DateTime.now().difference(_lastLoadTime!);
+    if (timeSinceLoad > _cacheDuration) {
+      _lastLoadTime = DateTime.now();
+      return true;
+    }
+
+    return false;
+  }
+
+  Future<void> _recheckSubscriptionForAddress(
+    String userId,
+    int addressId,
+  ) async {
+    // Skip if we're already loading or data is cached
+    if (!_shouldReloadData(addressId)) {
+      return;
+    }
+
+    try {
+      // Re-check subscription status for the new address - PASS addressId!
+      final subscriptionResult = await SubscriptionService.instance
+          .getUserSubscriptions(userId, addressId: addressId);
+
+      if (mounted) {
+        if (subscriptionResult['success'] == true &&
+            subscriptionResult['data'] != null &&
+            subscriptionResult['data']['subscriptions'] != null &&
+            (subscriptionResult['data']['subscriptions'] as List).isNotEmpty) {
+          // User has subscription - show add-ons view
+          final subscriptions =
+              subscriptionResult['data']['subscriptions'] as List;
+
+          final planName =
+              subscriptions.first['subsplanName']?.toString() ??
+              subscriptions.first['productDescription']?.toString() ??
+              'Current Plan';
+
+          setState(() {
+            hasSubscription = true;
+            currentPlan = planName;
+          });
+
+          // Load add-ons for subscription (already hardcoded)
+          await _loadAddOns(userId, addressId);
+        } else {
+          // No subscription, load products for this address
+          setState(() {
+            hasSubscription = false;
+          });
+          await _loadProducts(userId, addressId);
+        }
+      }
+    } catch (e) {
+      // If error, assume no subscription and load products
+      if (mounted) {
+        setState(() {
+          hasSubscription = false;
+        });
+        await _loadProducts(userId, addressId);
+      }
     }
   }
 
@@ -108,8 +178,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   Future<void> _checkUserSubscription(String userId) async {
     try {
+      // Get selected address before checking subscription
+      final selectedAddressId = AddressManager.instance.selectedAddressId;
+
+      // Pass addressId to subscription service
       final subscriptionResult = await SubscriptionService.instance
-          .getUserSubscriptions(userId);
+          .getUserSubscriptions(userId, addressId: selectedAddressId);
 
       if (subscriptionResult['success'] == true &&
           subscriptionResult['data'] != null &&
@@ -130,7 +204,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
         });
 
         // Load add-ons for subscription
-        final selectedAddressId = AddressManager.instance.selectedAddressId;
         await _loadAddOns(userId, selectedAddressId);
       } else {
         // No subscription, load products normally
@@ -138,10 +211,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
         setState(() {
           hasSubscription = false;
         });
-        final selectedAddressId = AddressManager.instance.selectedAddressId;
         await _loadProducts(userId, selectedAddressId);
       }
-    } catch (e, stackTrace) {
+    } catch (e) {
       setState(() {
         hasSubscription = false;
       });
@@ -152,32 +224,38 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   Future<void> _loadProducts(String userId, int? addressId) async {
     try {
-      setState(() {
-        isLoading = true;
-        errorMessage = '';
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = true;
+          errorMessage = '';
+        });
+      }
 
       final result = await ProductService.instance.getProducts(
         userId: userId,
         addressId: addressId,
       );
 
-      if (result['success'] == true && result['data'] != null) {
+      if (mounted) {
+        if (result['success'] == true && result['data'] != null) {
+          setState(() {
+            products = result['data'] as List<Product>;
+            isLoading = false;
+          });
+        } else {
+          setState(() {
+            errorMessage = result['message'] ?? 'Failed to load products';
+            isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
         setState(() {
-          products = result['data'] as List<Product>;
-          isLoading = false;
-        });
-      } else {
-        setState(() {
-          errorMessage = result['message'] ?? 'Failed to load products';
+          errorMessage = 'Error loading products. Please try again.';
           isLoading = false;
         });
       }
-    } catch (e) {
-      setState(() {
-        errorMessage = 'Error loading products. Please try again.';
-        isLoading = false;
-      });
     }
   }
 
@@ -187,193 +265,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
     setState(() {
       isLoading = false;
     });
-  }
-
-  void _showPurchaseDialog(Product product) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Purchase ${product.name}',
-          style: const TextStyle(fontFamily: 'Open Sans'),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Product: ${product.name}',
-              style: const TextStyle(fontFamily: 'Open Sans'),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Price: ${product.formattedPrice}',
-              style: const TextStyle(
-                fontFamily: 'Open Sans',
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Do you want to proceed with this purchase?',
-              style: TextStyle(fontFamily: 'Open Sans'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              await _processOrder(product);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4CB04C),
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Confirm Purchase'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _processOrder(Product product) async {
-    if (userId.isEmpty) return;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const AlertDialog(
-        content: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 16),
-            Text(
-              'Processing order...',
-              style: TextStyle(fontFamily: 'Open Sans'),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    try {
-      final addressResult = await AddressService.instance.getUserAddresses(
-        userId,
-      );
-      int? selectedAddressId;
-
-      if (addressResult['success'] == true && addressResult['data'] != null) {
-        final addresses = addressResult['data'] as List<UserAddress>;
-        if (addresses.isNotEmpty) {
-          selectedAddressId = addresses.first.addressId;
-        }
-      }
-
-      final orderRequest = OrderRequest(
-        userId: userId,
-        productId: product.pid,
-        userAddressId: selectedAddressId ?? 1,
-        level: '1',
-        block: 'A',
-        unitNumber: '001',
-      );
-
-      final orderResult = await OrderService.instance.createOrder(orderRequest);
-
-      if (mounted) Navigator.of(context).pop();
-
-      if (orderResult['success'] == true) {
-        if (mounted) {
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => AlertDialog(
-              title: const Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.green, size: 28),
-                  SizedBox(width: 8),
-                  Text(
-                    'Order Successful!',
-                    style: TextStyle(fontFamily: 'Open Sans'),
-                  ),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Your order for ${product.name} has been placed successfully.',
-                    style: const TextStyle(fontFamily: 'Open Sans'),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'A new bill has been generated and added to your account.',
-                    style: TextStyle(fontFamily: 'Open Sans'),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'You will be redirected to the home page.',
-                    style: TextStyle(fontFamily: 'Open Sans'),
-                  ),
-                ],
-              ),
-              actions: [
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    _navigateToHome();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text(
-                    'Continue',
-                    style: TextStyle(fontFamily: 'Open Sans'),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(orderResult['message'] ?? 'Failed to create order'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) Navigator.of(context).pop();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error processing order: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  void _navigateToHome() {
-    // Cache clearing removed - no longer needed
-
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const HomeScreen()),
-      (route) => false,
-    );
   }
 
   @override
@@ -565,7 +456,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
   // Content for users WITHOUT subscription
   Widget _buildNoSubscriptionContent() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
+      padding: const EdgeInsets.all(8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -578,7 +469,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
               fontFamily: 'Open Sans',
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
 
           // Products Grid
           Expanded(

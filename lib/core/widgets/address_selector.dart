@@ -132,7 +132,7 @@ class _AddressSelectorState extends State<AddressSelector>
                   vertical: 8,
                 ),
                 child: Text(
-                  addresses.length == 1 ? 'Current Address' : 'Select Address',
+                  addresses.length == 1 ? 'Addresses' : 'Select Address',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,

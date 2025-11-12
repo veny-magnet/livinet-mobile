@@ -31,13 +31,40 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 4),
+    final overlay = Overlay.of(context);
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        bottom: 80,
+        left: 0,
+        right: 0,
+        child: Center(
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.green,
+                borderRadius: BorderRadius.circular(100),
+              ),
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Open Sans',
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
+
+    overlay.insert(overlayEntry);
+    Future.delayed(const Duration(seconds: 2), () {
+      overlayEntry.remove();
+    });
   }
 
   Future<void> _onLogin(BuildContext context) async {
@@ -74,12 +101,10 @@ class _LoginScreenState extends State<LoginScreen> {
         if (initResult['success']) {
           _showSuccess('Login successful!');
           context.go('/home');
-        } else {
-          _showError('Login successful but failed to load data');
-          context.go('/home'); // Still navigate but with error
         }
       } else {
-        // Handle error...
+        // Show error message using snackbar
+        _showError(result['message'] ?? 'Login failed');
       }
     } catch (e) {
       _showError('Login error: $e');
