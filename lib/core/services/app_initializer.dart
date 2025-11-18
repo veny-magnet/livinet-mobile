@@ -68,11 +68,11 @@ class AppInitializer {
       // Check authentication
       final currentUser = await authService.getCurrentUser();
 
-      if (currentUser == null || currentUser['user_id'] == null) {
+      if (currentUser == null || currentUser['code'] == null) {
         return {'success': false, 'message': 'User not authenticated'};
       }
 
-      final userId = currentUser['user_id'] as String;
+      final userId = currentUser['code'] as String;
 
       return {'success': true, 'userId': userId};
     } catch (e) {

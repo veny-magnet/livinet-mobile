@@ -13,9 +13,14 @@ class OrderService {
 
   Future<Map<String, dynamic>> createOrder(OrderRequest request) async {
     try {
+      final requestBody = request.toJson();
+
+      // Log request body for debugging
+      _logger.debug('Creating order with request: $requestBody');
+
       final response = await _apiService.post<OrderResponse>(
         '/insert/order',
-        body: request.toJson(),
+        body: requestBody,
         fromJson: (json) => OrderResponse.fromJson(json),
       );
 

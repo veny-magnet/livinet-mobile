@@ -27,7 +27,7 @@ class _OrderDialogState extends State<OrderDialog> {
 
   bool _isLoading = false;
   String? _userId;
-  int? _selectedAddressId;
+  String? _selectedAddressCode;
   List<UserAddress> _addresses = [];
 
   @override
@@ -42,8 +42,8 @@ class _OrderDialogState extends State<OrderDialog> {
       final authService = AuthService();
       final userData = await authService.getCurrentUser();
 
-      if (userData != null && userData['user_id'] != null) {
-        _userId = userData['user_id'];
+      if (userData != null && userData['code'] != null) {
+        _userId = userData['code']; // Use UUID (code) as userId
         await _loadAddresses();
       } else {
         throw Exception('User not authenticated');
@@ -70,7 +70,7 @@ class _OrderDialogState extends State<OrderDialog> {
         setState(() {
           _addresses = result['data'] as List<UserAddress>;
           if (_addresses.isNotEmpty) {
-            _selectedAddressId = _addresses.first.addressId;
+            _selectedAddressCode = _addresses.first.code;
           }
         });
       }
@@ -83,7 +83,7 @@ class _OrderDialogState extends State<OrderDialog> {
     if (!_formKey.currentState!.validate()) return;
     if (_userId == null) return;
 
-    if (_selectedAddressId == null) {
+    if (_selectedAddressCode == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please select an address'),
@@ -118,9 +118,9 @@ class _OrderDialogState extends State<OrderDialog> {
 
     try {
       final orderRequest = OrderRequest(
-        userId: _userId!,
+        userCode: _userId!,
         productId: widget.product.pid,
-        userAddressId: _selectedAddressId!,
+        addressCode: _selectedAddressCode!,
         level: _levelController.text.trim().isEmpty
             ? '1'
             : _levelController.text.trim(),

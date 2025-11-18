@@ -21,7 +21,7 @@ class UserProfileService {
 
   /// Get user profile - always fetch fresh from API
   Future<Map<String, dynamic>> getUserProfile(
-    String userId, {
+    String code, {
     bool forceRefresh = false,
   }) async {
     try {
@@ -29,7 +29,7 @@ class UserProfileService {
       final response = await ApiInterceptor.get(
         Uri.parse(
           '$baseUrl/get/profile',
-        ).replace(queryParameters: {'user_id': userId}),
+        ).replace(queryParameters: {'code': code}),
         requireAuth: true,
       );
 
@@ -93,9 +93,9 @@ class UserProfileService {
   }
 
   /// Get basic profile info for home screen (points, username, user ID)
-  Future<Map<String, dynamic>> getBasicProfileInfo(String userId) async {
+  Future<Map<String, dynamic>> getBasicProfileInfo(String code) async {
     try {
-      final result = await getUserProfile(userId);
+      final result = await getUserProfile(code);
 
       if (result['success'] == true && result['data'] != null) {
         final UserProfile profile = result['data'];
@@ -138,7 +138,7 @@ class UserProfileService {
         };
       }
 
-      if (currentUser == null || currentUser['user_id'] == null) {
+      if (currentUser == null || currentUser['code'] == null) {
         return {
           'success': false,
           'message': 'User session not found. Please login again.',
@@ -146,9 +146,9 @@ class UserProfileService {
         };
       }
 
-      // Use the user ID from current session
-      final userId = currentUser['user_id'] as String;
-      return await getUserProfile(userId);
+      // Use the code from current session
+      final code = currentUser['code'] as String;
+      return await getUserProfile(code);
     } catch (e) {
       _logger.error('Error fetching current user profile', e);
       return {

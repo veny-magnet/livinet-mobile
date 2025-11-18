@@ -25,17 +25,18 @@ class PayScreen extends StatefulWidget {
 class _PayScreenState extends State<PayScreen> {
   String status = '';
   String userId = '';
+  String userCode = ''; // UUID dari login
   bool isLoading = true;
   List<BillHistory> billHistory = [];
   order_detail.OrderDetailsResponse? orderDetailsData;
   order_detail.OrderDetail? currentOrderDetail;
   String errorMessage = '';
-  int? selectedAddressId;
+  String? selectedAddressCode;
   String currentPlanName = '';
 
   DateTime? _lastLoadTime;
   static const Duration _cacheDuration = Duration(minutes: 5);
-  int? _lastLoadedAddressId;
+  String? _lastLoadedAddressId;
 
   @override
   void initState() {
@@ -56,16 +57,16 @@ class _PayScreenState extends State<PayScreen> {
     // When address changes, reload bill history for the new address
     if (mounted && address != null) {
       // Use deduplication to prevent duplicate API calls
-      if (_shouldReloadData(address.addressId)) {
-        _loadBillHistoryForAddress(address.addressId);
+      if (_shouldReloadData(address.code)) {
+        _loadBillHistory();
       }
     }
   }
 
-  bool _shouldReloadData(int? addressId) {
+  bool _shouldReloadData(String? addressCode) {
     // Only reload if address is different OR cache expired
-    if (_lastLoadedAddressId != addressId) {
-      _lastLoadedAddressId = addressId;
+    if (_lastLoadedAddressId != addressCode) {
+      _lastLoadedAddressId = addressCode;
       _lastLoadTime = DateTime.now();
       return true;
     }
@@ -122,24 +123,38 @@ class _PayScreenState extends State<PayScreen> {
 
   Future<void> _loadUserProfile() async {
     try {
+      // Get user info from auth untuk extract userCode (UUID)
+      final authService = AuthService();
+      final userInfo = await authService.getCurrentUser();
+
+      if (userInfo != null) {
+        userCode = userInfo['code']?.toString() ?? ''; // UUID dari login
+        userId = userInfo['user_id']?.toString() ?? '';
+      }
+
+      // Also get profile data
       final result = await UserProfileService.instance.getCurrentUserProfile();
 
       if (result['success'] == true && result['data'] != null) {
         final data = result['data'];
         status = data.status ?? '';
-        userId = data.userId ?? '';
+        if (userId.isEmpty) {
+          userId = data.userId ?? '';
+        }
 
-        // Load default address from AddressManager if needed
-        if (status == 'verified' && userId.isNotEmpty) {
-          await AddressManager.instance.loadDefaultAddress(userId);
+        // Load default address from AddressManager if needed, using userCode (UUID)
+        if (status == 'verified' && userCode.isNotEmpty) {
+          await AddressManager.instance.loadDefaultAddress(userCode);
         }
       } else {
         status = '';
         userId = '';
+        userCode = '';
       }
     } catch (e) {
       status = '';
       userId = '';
+      userCode = '';
     }
   }
 
@@ -151,9 +166,9 @@ class _PayScreenState extends State<PayScreen> {
       }
 
       // Use AddressManager as single source of truth
-      final addressId = AddressManager.instance.selectedAddressId;
+      final addressCode = AddressManager.instance.selectedAddressCode;
 
-      if (addressId == null) {
+      if (addressCode == null) {
         errorMessage = 'No address selected';
         return;
       }
@@ -161,8 +176,8 @@ class _PayScreenState extends State<PayScreen> {
       // Load OrderDetails for BillCard
       final orderDetailsService = OrderDetailsService.instance;
       final orderDetailsResponse = await orderDetailsService.getOrderDetails(
-        userId: userId,
-        userAddressId: addressId,
+        userId: userCode,
+        userAddressId: addressCode,
       );
 
       if (orderDetailsResponse != null &&
@@ -177,8 +192,8 @@ class _PayScreenState extends State<PayScreen> {
 
       // Load BillHistory for Payment History section
       final billRequest = BillHistoryRequest(
-        userId: userId,
-        userAddressId: addressId,
+        userCode: userCode,
+        addressCode: addressCode,
       );
 
       final result = await BillService.instance.getBillHistory(billRequest);
@@ -189,9 +204,9 @@ class _PayScreenState extends State<PayScreen> {
         billHistory = [];
       }
 
-      // Update state with address ID
+      // Update state with address code
       setState(() {
-        selectedAddressId = addressId;
+        selectedAddressCode = addressCode;
       });
     } catch (e) {
       errorMessage = 'Error loading data: $e';
@@ -215,59 +230,6 @@ class _PayScreenState extends State<PayScreen> {
       }
     } catch (e) {
       // Keep default name if error occurs
-    }
-  }
-
-  Future<void> _loadBillHistoryForAddress(int addressId) async {
-    try {
-      if (userId.isEmpty) {
-        return;
-      }
-
-      // Load OrderDetails for the new address
-      final orderDetailsResponse = await OrderDetailsService.instance
-          .getOrderDetails(userId: userId, userAddressId: addressId);
-
-      // Load BillHistory for the new address
-      final billRequest = BillHistoryRequest(
-        userId: userId,
-        userAddressId: addressId,
-      );
-
-      final billResult = await BillService.instance.getBillHistory(billRequest);
-
-      // Update state immediately after both API calls complete
-      if (mounted) {
-        setState(() {
-          selectedAddressId = addressId;
-
-          // Update OrderDetails data
-          if (orderDetailsResponse != null &&
-              orderDetailsResponse.orders.isNotEmpty) {
-            orderDetailsData = orderDetailsResponse;
-            currentOrderDetail = orderDetailsResponse.orders.first;
-          } else {
-            orderDetailsData = null;
-            currentOrderDetail = null;
-          }
-
-          // Update BillHistory data
-          if (billResult['success'] == true && billResult['data'] != null) {
-            billHistory = billResult['data'] as List<BillHistory>;
-          } else {
-            billHistory = [];
-          }
-        });
-
-        // Load plan name after state update
-        await _loadCurrentPlanName();
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          errorMessage = 'Error loading bill history: $e';
-        });
-      }
     }
   }
 
@@ -313,8 +275,8 @@ class _PayScreenState extends State<PayScreen> {
                   : currentOrderDetail != null
                   ? BillCard.fromOrderDetail(
                       orderDetail: currentOrderDetail!,
-                      userId: userId,
-                      userAddressId: selectedAddressId,
+                      userId: userCode,
+                      userAddressId: selectedAddressCode,
                     )
                   : const NoPlanWidget(),
             ],

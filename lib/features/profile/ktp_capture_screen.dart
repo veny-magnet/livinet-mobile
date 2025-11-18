@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../core/services/openai_ocr_service.dart';
+import '../../core/services/ktp_service.dart';
+import '../../core/services/auth_service.dart';
+import '../../core/widgets/app_button.dart';
 import 'ktp_review_screen.dart';
 
 class KtpCaptureScreen extends StatefulWidget {
@@ -15,41 +17,18 @@ class KtpCaptureScreen extends StatefulWidget {
 
 class _KtpCaptureScreenState extends State<KtpCaptureScreen> {
   final ImagePicker _picker = ImagePicker();
+  final KtpService _ktpService = KtpService();
+
   File? _ktpImage;
   bool _isProcessing = false;
   String _processingMessage = '';
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Stack(
         children: [
-          // Background gradients
-          Positioned(
-            top: -30,
-            left: 0,
-            right: 0,
-            child: Image.asset(
-              "assets/images/top_gradient.png",
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: screenHeight * 0.35,
-            ),
-          ),
-          Positioned(
-            bottom: -30,
-            left: 0,
-            right: 0,
-            child: Image.asset(
-              "assets/images/bottom_gradient.png",
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: screenHeight * 0.35,
-            ),
-          ),
-
           // Main content
           SafeArea(
             child: Column(
@@ -60,7 +39,7 @@ class _KtpCaptureScreenState extends State<KtpCaptureScreen> {
                   child: Row(
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.green),
+                        icon: const Icon(Icons.arrow_back, color: Colors.black),
                         onPressed: () => Navigator.pop(context),
                       ),
                       const SizedBox(width: 8),
@@ -69,18 +48,12 @@ class _KtpCaptureScreenState extends State<KtpCaptureScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Upload KTP',
+                              'Upload ID Card (KTP) ',
                               style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.green,
-                              ),
-                            ),
-                            Text(
-                              'Step 2 of 3',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black,
+                                fontFamily: 'Open Sans',
                               ),
                             ),
                           ],
@@ -98,51 +71,6 @@ class _KtpCaptureScreenState extends State<KtpCaptureScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         const SizedBox(height: 20),
-
-                        // Instructions card
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.blue.withOpacity(0.3),
-                              width: 1,
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.info_outline,
-                                    color: Colors.blue[700],
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Tips for a good KTP photo:',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.blue[700],
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              _buildTipItem('Ensure KTP is well-lit'),
-                              _buildTipItem(
-                                'Avoid shadows and light reflections',
-                              ),
-                              _buildTipItem('Take a clear, non-blurry photo'),
-                              _buildTipItem('Ensure the entire KTP is visible'),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 32),
 
                         // KTP preview or placeholder
                         if (_ktpImage != null)
@@ -204,11 +132,12 @@ class _KtpCaptureScreenState extends State<KtpCaptureScreen> {
                                 ),
                                 const SizedBox(height: 12),
                                 Text(
-                                  'No KTP photo yet',
+                                  'No ID Card image selected',
                                   style: TextStyle(
                                     color: Colors.grey[600],
                                     fontSize: 14,
                                     fontWeight: FontWeight.w500,
+                                    fontFamily: 'Open Sans',
                                   ),
                                 ),
                               ],
@@ -224,7 +153,7 @@ class _KtpCaptureScreenState extends State<KtpCaptureScreen> {
                             onPressed: _isProcessing ? null : _takePhoto,
                             icon: const Icon(Icons.camera_alt, size: 24),
                             label: const Text(
-                              'Take KTP Photo',
+                              'Take a Picture',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -251,7 +180,7 @@ class _KtpCaptureScreenState extends State<KtpCaptureScreen> {
                             onPressed: _isProcessing ? null : _pickFromGallery,
                             icon: const Icon(Icons.photo_library, size: 24),
                             label: const Text(
-                              'Pick from Gallery',
+                              'Choose from Gallery',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -275,27 +204,10 @@ class _KtpCaptureScreenState extends State<KtpCaptureScreen> {
 
                         // Process button (only show when image is selected)
                         if (_ktpImage != null)
-                          SizedBox(
-                            height: 56,
-                            child: ElevatedButton(
-                              onPressed: _isProcessing ? null : _processKtp,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green[700],
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 2,
-                              ),
-                              child: const Text(
-                                'Process KTP',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  fontFamily: 'Open Sans',
-                                ),
-                              ),
-                            ),
+                          AppButton(
+                            text: _isProcessing ? 'Processing' : 'Continue',
+                            onPressed: _isProcessing ? null : _processKtp,
+                            isPrimary: true,
                           ),
                       ],
                     ),
@@ -320,7 +232,9 @@ class _KtpCaptureScreenState extends State<KtpCaptureScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(0xFF4CB04C),
+                        ),
                         strokeWidth: 3,
                       ),
                       const SizedBox(height: 20),
@@ -330,6 +244,7 @@ class _KtpCaptureScreenState extends State<KtpCaptureScreen> {
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: Colors.black87,
+                          fontFamily: 'Open Sans',
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -338,25 +253,6 @@ class _KtpCaptureScreenState extends State<KtpCaptureScreen> {
                 ),
               ),
             ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTipItem(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.check_circle, size: 16, color: Colors.blue[700]),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(fontSize: 13, color: Colors.blue[900]),
-            ),
-          ),
         ],
       ),
     );
@@ -398,119 +294,71 @@ class _KtpCaptureScreenState extends State<KtpCaptureScreen> {
 
   Future<void> _processKtp() async {
     if (_ktpImage == null) {
-      _showError('Please select a KTP photo first');
+      _showError('Please select an ID Card photo first');
+      return;
+    }
+
+    // Validate image
+    if (!_ktpService.validateKtpImage(_ktpImage!)) {
+      _showError(
+        'ID Card file is not valid. Ensure the file is jpg/png and under 5MB.',
+      );
       return;
     }
 
     setState(() {
       _isProcessing = true;
-      _processingMessage = 'Scanning KTP...';
+      _processingMessage = 'Uploading and processing ID Card...';
     });
 
     try {
-      // Process KTP with OCR
-      final ocrData = await _processKtpWithOcr(_ktpImage!);
+      // Get user code from auth service
+      final authService = AuthService();
+      final currentUser = await authService.getCurrentUser();
 
-      if (!mounted) return;
-
-      if (ocrData == null) {
-        setState(() {
-          _isProcessing = false;
-          _processingMessage = '';
-        });
-        _showError(
-          'Failed to scan KTP. Ensure the photo is clear and try again.',
-        );
+      if (currentUser == null || currentUser['code'] == null) {
+        _showError('Please login again. User not authenticated.');
+        setState(() => _isProcessing = false);
         return;
       }
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => KtpReviewScreen(
-            registrationData: widget.registrationData,
-            ktpImage: _ktpImage!,
-            ocrData: ocrData,
-          ),
-        ),
+      String userCode = currentUser['code'];
+
+      setState(() => _processingMessage = 'Processing ID Card...');
+
+      // Upload and extract KTP data via API
+      final result = await _ktpService.uploadAndExtractKtp(
+        userCode: userCode,
+        ktpImageFile: _ktpImage!,
       );
-    } catch (e) {
+
+      if (!mounted) return;
+
+      // Debug log untuk melihat response dari API
+      print('Upload KTP Response: $result');
+
+      if (!result['success']) {
+        setState(() => _isProcessing = false);
+        _showError(result['message'] ?? 'Failed to process ID Card');
+        return;
+      }
+
+      // Successfully uploaded, navigate to review screen with OCR data
       if (mounted) {
-        setState(() {
-          _isProcessing = false;
-          _processingMessage = '';
-        });
-        _showError('Error: $e');
-      }
-    }
-  }
-
-  Future<Map<String, dynamic>?> _processKtpWithOcr(File ktpImageFile) async {
-    try {
-      debugPrint('Scanning KTP');
-
-      setState(() {
-        _isProcessing = true;
-        _processingMessage = 'Scanning KTP';
-      });
-
-      // Call OpenAI OCR Service
-      final extractedData = await OpenAIOcrService.extractKtpData(ktpImageFile);
-
-      if (extractedData == null) {
-        throw Exception('Failed to extract KTP data from OpenAI');
-      }
-
-      // Validate extracted KTP data
-      if (!OpenAIOcrService.validateKtpData(extractedData)) {
-        throw Exception(
-          'Image does not appear to be a valid KTP. Please upload a clear KTP photo.',
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => KtpReviewScreen(
+              ktpImage: _ktpImage!,
+              ocrData: result['data'] ?? {},
+            ),
+          ),
         );
+        setState(() => _isProcessing = false);
       }
-
-      debugPrint('OpenAI OCR Result: $extractedData');
-
-      setState(() {
-        _processingMessage = 'Processing OCR result...';
-      });
-
-      // Build final result with proper structure
-      final firstName =
-          extractedData['nama']?.toString().split(' ').first ?? '';
-      final lastName = extractedData['nama'] != null
-          ? extractedData['nama']!.toString().split(' ').skip(1).join(' ')
-          : '';
-
-      return {
-        'national_id_number': extractedData['nik'] ?? '',
-        'full_name': extractedData['nama'] ?? '',
-        'first_name': firstName,
-        'last_name': lastName,
-        'birth_place': extractedData['tempat_lahir'] ?? '',
-        'birth_date': extractedData['tanggal_lahir'] ?? '',
-        'gender': extractedData['jenis_kelamin'] ?? '',
-        'address': extractedData['alamat'] ?? '',
-        'rt': extractedData['rt'] ?? '',
-        'rw': extractedData['rw'] ?? '',
-        'village': extractedData['kelurahan'] ?? '',
-        'district': extractedData['kecamatan'] ?? '',
-        'religion': extractedData['agama'] ?? '',
-        'marital_status': extractedData['status_perkawinan'] ?? '',
-        'occupation': extractedData['pekerjaan'] ?? '',
-        'citizenship': extractedData['kewarganegaraan'] ?? 'WNI',
-        'valid_until': extractedData['berlaku_hingga'] ?? '',
-        'province': extractedData['provinsi'] ?? '',
-        'city': extractedData['kota'] ?? '',
-      };
     } catch (e) {
-      debugPrint('OpenAI OCR processing error: $e');
-      _showError('Error scanning KTP: $e');
-      return null;
-    } finally {
       if (mounted) {
-        setState(() {
-          _isProcessing = false;
-        });
+        setState(() => _isProcessing = false);
+        _showError('Error: $e');
       }
     }
   }

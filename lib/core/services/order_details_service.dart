@@ -13,8 +13,8 @@ class OrderDetailsService {
   /// NO CACHE - Always fetch fresh data from server
   Future<OrderDetailsResponse?> getOrderDetails({
     required String userId,
-    int? userAddressId,
-    bool forceRefresh = false, // Keep parameter for backward compatibility
+    String? userAddressId,
+    bool forceRefresh = false,
   }) async {
     try {
       // Create request object
@@ -57,7 +57,7 @@ class OrderDetailsService {
   Future<OrderDetail?> getOrderById({
     required String userId,
     required int orderId,
-    int? userAddressId,
+    String? userAddressId,
   }) async {
     try {
       final response = await getOrderDetails(
@@ -87,7 +87,7 @@ class OrderDetailsService {
   Future<List<OrderDetail>> getOrdersByStatus({
     required String userId,
     required String status,
-    int? userAddressId,
+    String? userAddressId,
   }) async {
     try {
       final response = await getOrderDetails(
@@ -118,7 +118,7 @@ class OrderDetailsService {
   /// Get unpaid orders for bill display
   Future<List<OrderDetail>> getUnpaidOrders({
     required String userId,
-    int? userAddressId,
+    String? userAddressId,
   }) async {
     return await getOrdersByStatus(
       userId: userId,
@@ -130,7 +130,7 @@ class OrderDetailsService {
   /// Get paid orders for history
   Future<List<OrderDetail>> getPaidOrders({
     required String userId,
-    int? userAddressId,
+    String? userAddressId,
   }) async {
     return await getOrdersByStatus(
       userId: userId,
@@ -142,7 +142,7 @@ class OrderDetailsService {
   /// Refresh order details data (alias for getOrderDetails with backward compatibility)
   Future<OrderDetailsResponse?> refreshOrderDetails({
     required String userId,
-    int? userAddressId,
+    String? userAddressId,
   }) async {
     return await getOrderDetails(
       userId: userId,

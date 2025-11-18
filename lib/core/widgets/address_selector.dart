@@ -6,14 +6,14 @@ import '../services/address_manager.dart';
 class AddressSelector extends StatefulWidget {
   final String? defaultAddress;
   final VoidCallback? onTap;
-  final String userId;
+  final String userCode; // Changed from userId to userCode (UUID)
   final Function(UserAddress)? onAddressSelected;
 
   const AddressSelector({
     super.key,
     this.defaultAddress,
     this.onTap,
-    required this.userId,
+    required this.userCode,
     this.onAddressSelected,
   });
 
@@ -52,7 +52,7 @@ class _AddressSelectorState extends State<AddressSelector>
   Future<void> _loadAddresses() async {
     try {
       final result = await AddressService.instance.getUserAddresses(
-        widget.userId,
+        widget.userCode, // Using userCode (UUID) instead of userId
       );
 
       setState(() {
@@ -64,7 +64,7 @@ class _AddressSelectorState extends State<AddressSelector>
             if (currentSelected != null) {
               // Try to find the same address in the current list
               final matchingAddress = addresses.firstWhere(
-                (addr) => addr.addressId == currentSelected.addressId,
+                (addr) => addr.code == currentSelected.code,
                 orElse: () => addresses.first,
               );
               selectedAddress = matchingAddress;
@@ -148,8 +148,7 @@ class _AddressSelectorState extends State<AddressSelector>
                   itemCount: addresses.length,
                   itemBuilder: (context, index) {
                     final address = addresses[index];
-                    final isSelected =
-                        selectedAddress?.addressId == address.addressId;
+                    final isSelected = selectedAddress?.code == address.code;
 
                     return ListTile(
                       contentPadding: const EdgeInsets.symmetric(

@@ -67,16 +67,16 @@ class ProductService {
   /// Get products - NO CACHE, always fetch fresh
   Future<Map<String, dynamic>> getProducts({
     required String userId,
-    int? addressId,
+    String? addressId,
     bool forceRefresh = false,
   }) async {
     try {
       _logger.debug('Fetching products from API');
 
       // Prepare query parameters
-      final Map<String, String> queryParams = {'user_id': userId};
+      final Map<String, String> queryParams = {'code': userId};
       if (addressId != null) {
-        queryParams['address_id'] = addressId.toString();
+        queryParams['address_code'] = addressId.toString();
       }
 
       // Add additional headers for ngrok
@@ -133,7 +133,7 @@ class ProductService {
   /// Get products for a specific user (uses default/first address)
   Future<Map<String, dynamic>> getProductsForUser(
     String userId, {
-    int? addressId,
+    String? addressId,
     bool forceRefresh = false,
   }) async {
     return await getProducts(userId: userId, addressId: addressId);
@@ -142,7 +142,7 @@ class ProductService {
   /// Get products for a specific address
   Future<Map<String, dynamic>> getProductsForAddress({
     required String userId,
-    required int addressId,
+    required String addressId,
   }) async {
     return await getProducts(userId: userId, addressId: addressId);
   }
@@ -216,7 +216,7 @@ class ProductService {
   /// Get product ID for bill payment based on bill context
   Future<int?> getProductIdForBill({
     required String userId,
-    required int userAddressId,
+    required String userAddressId,
     String? planName,
     String? invoiceId,
   }) async {

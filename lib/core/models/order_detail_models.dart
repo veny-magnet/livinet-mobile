@@ -1,14 +1,14 @@
 // Order Details Models
 class OrderDetailsRequest {
   final String userId;
-  final int? userAddressId;
+  final String? userAddressId;
 
   OrderDetailsRequest({required this.userId, this.userAddressId});
 
   Map<String, String> toQueryParams() {
-    final params = <String, String>{'user_id': userId};
+    final params = <String, String>{'code': userId};
     if (userAddressId != null) {
-      params['user_address_id'] = userAddressId.toString();
+      params['address_code'] = userAddressId!;
     }
     return params;
   }

@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import '../../core/widgets/app_bottom_navigation.dart';
 import '../../core/widgets/profile_header.dart';
 import '../../core/widgets/profile_menu_section.dart';
-import '../../core/widgets/not_verified_widget.dart';
-import '../../core/services/user_profile_service.dart';
+import '../../core/services/ktp_service.dart';
 import '../../core/services/auth_service.dart';
 import 'edit_profile_screen.dart';
 import 'address_screen.dart';
 import 'change-password_screen.dart';
+import 'ktp_capture_screen.dart';
+import 'ktp_review_screen.dart';
+import 'help_contact_screen.dart';
+import 'terms_conditions_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -18,60 +21,25 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   String status = '';
-  bool isLoading = true;
+  bool isLoading = false;
   String? userId;
 
   @override
   void initState() {
     super.initState();
-    _loadUserProfile();
+    _loadUserId();
   }
 
-  Future<void> _loadUserProfile() async {
+  Future<void> _loadUserId() async {
     try {
-      // Get user ID from auth service
       final authService = AuthService();
       final currentUser = await authService.getCurrentUser();
-
-      String? userIdToUse;
-
-      if (currentUser != null && currentUser['user_id'] != null) {
-        userIdToUse = currentUser['user_id'];
-      } else {
-        // If no user found in auth, user needs to login
+      if (currentUser != null && mounted) {
         setState(() {
-          status = 'not_logged_in';
-          isLoading = false;
-        });
-        return;
-      }
-
-      // getUserProfile will use cache automatically via CacheManager
-      final result = await UserProfileService.instance.getUserProfile(
-        userIdToUse!,
-      );
-
-      if (result['success'] == true && result['data'] != null) {
-        final data = result['data'];
-        setState(() {
-          status = data.status ?? '';
-          userId = data.userId ?? userIdToUse;
-          isLoading = false;
-        });
-      } else {
-        setState(() {
-          status = '';
-          userId = userIdToUse;
-          isLoading = false;
+          userId = currentUser['code'] as String?;
         });
       }
-    } catch (e) {
-      setState(() {
-        status = 'error';
-        userId = null;
-        isLoading = false;
-      });
-    }
+    } catch (e) {}
   }
 
   @override
@@ -86,11 +54,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
 
-    // Show NotVerifiedWidget if user is not verified
-    if (status == 'not_verified') {
-      return const NotVerifiedWidget(currentRoute: '/profile');
-    }
-
     // Account menu items
     final accountMenuItems = [
       {
@@ -101,7 +64,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => AddressScreen(userId: userId!),
+                builder: (context) => AddressScreen(userCode: userId!),
               ),
             );
           }
@@ -129,21 +92,79 @@ class _ProfileScreenState extends State<ProfileScreen> {
           );
         },
       },
-      {'icon': Icons.emoji_events_outlined, 'title': 'Points', 'onTap': null},
+      {
+        'icon': Icons.credit_card,
+        'title': 'ID Card (KTP)',
+        'onTap': () async {
+          try {
+            // Get user code from auth
+            final authService = AuthService();
+            final ktpService = KtpService();
+            final currentUser = await authService.getCurrentUser();
+
+            if (currentUser == null || currentUser['code'] == null) {
+              return;
+            }
+
+            final userCode = currentUser['code'] as String;
+
+            // Get KTP data
+            final ktpResult = await ktpService.getKtpData(userCode: userCode);
+
+            if (mounted) {
+              if (ktpResult['success'] == true && ktpResult['data'] != null) {
+                // KTP data exists, show preview screen
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => KtpReviewScreen(
+                      ktpImage: null,
+                      ocrData: ktpResult['data'] ?? {},
+                      isPreviewMode: true,
+                    ),
+                  ),
+                );
+              } else {
+                // No KTP data, go to capture screen
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        KtpCaptureScreen(registrationData: {}),
+                  ),
+                );
+              }
+            }
+          } catch (e) {
+            // Handle error silently
+          }
+        },
+      },
     ];
 
     // Other menu items
     final otherMenuItems = [
-      {'icon': Icons.help_outline, 'title': 'Help', 'onTap': null},
       {
-        'icon': Icons.router_rounded,
-        'title': 'Service and Device Information',
-        'onTap': null,
+        'icon': Icons.help_outline,
+        'title': 'Help and Contact Support',
+        'onTap': () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const HelpContactScreen()),
+          );
+        },
       },
       {
         'icon': Icons.description_outlined,
         'title': 'Terms and Conditions',
-        'onTap': null,
+        'onTap': () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const TermsConditionsScreen(),
+            ),
+          );
+        },
       },
     ];
 

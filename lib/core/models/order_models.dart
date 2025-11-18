@@ -1,15 +1,15 @@
 class OrderRequest {
-  final String userId;
+  final String userCode; // UUID identifier
   final int productId;
-  final int userAddressId;
+  final String addressCode; // Address code/UUID
   final String level;
   final String block;
   final String unitNumber;
 
   OrderRequest({
-    required this.userId,
+    required this.userCode,
     required this.productId,
-    required this.userAddressId,
+    required this.addressCode,
     required this.level,
     required this.block,
     required this.unitNumber,
@@ -17,9 +17,9 @@ class OrderRequest {
 
   Map<String, dynamic> toJson() {
     return {
-      'user_id': userId,
+      'code': userCode,
       'product_id': productId,
-      'user_address_id': userAddressId,
+      'address_code': addressCode,
       'level': level,
       'block': block,
       'unit_number': unitNumber,

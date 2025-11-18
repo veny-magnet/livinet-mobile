@@ -8,9 +8,9 @@ import 'address_detail_screen.dart';
 import 'add_address_screen.dart';
 
 class AddressScreen extends StatefulWidget {
-  final String userId;
+  final String userCode;
 
-  const AddressScreen({super.key, required this.userId});
+  const AddressScreen({super.key, required this.userCode});
 
   @override
   State<AddressScreen> createState() => _AddressScreenState();
@@ -35,13 +35,13 @@ class _AddressScreenState extends State<AddressScreen> {
     });
 
     try {
-      // Load addresses
+      // Load addresses using userCode (UUID)
       final addressResult = await AddressService.instance.getUserAddresses(
-        widget.userId,
+        widget.userCode,
       );
 
       final subscriptionResult = await SubscriptionService.instance
-          .getUserSubscriptions(widget.userId);
+          .getUserSubscriptions(widget.userCode);
 
       if (addressResult['success'] == true && addressResult['data'] != null) {
         setState(() {
@@ -74,7 +74,7 @@ class _AddressScreenState extends State<AddressScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddAddressScreen(userId: widget.userId),
+        builder: (context) => AddAddressScreen(userCode: widget.userCode),
       ),
     ).then((_) {
       // Refresh list when returning from add screen
@@ -109,8 +109,8 @@ class _AddressScreenState extends State<AddressScreen> {
       }
 
       final result = await AddressService.instance.deleteAddress(
-        userId: widget.userId,
-        addressId: address.addressId,
+        userCode: widget.userCode,
+        code: address.code,
       );
 
       // Close loading dialog
@@ -126,19 +126,16 @@ class _AddressScreenState extends State<AddressScreen> {
             title: 'Success',
             message: result['message'] ?? 'Address deleted successfully!',
             onConfirm: () {
-              Navigator.of(context).pop();
+              // Refresh list without closing the screen
+              _loadAddresses();
             },
           );
-          // Refresh list after closing success dialog
-          _loadAddresses();
         } else {
           DialogHelper.showError(
             context,
             title: 'Error',
             message: result['message'] ?? 'Failed to delete address',
-            onConfirm: () {
-              Navigator.of(context).pop();
-            },
+            onConfirm: () {},
           );
         }
       }
@@ -265,17 +262,18 @@ class _AddressScreenState extends State<AddressScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) =>
-                                AddressDetailScreen(address: address),
+                            builder: (context) => AddressDetailScreen(
+                              address: address,
+                              onAddressDeleted: () {
+                                // Refresh list when address is deleted
+                                _loadAddresses();
+                              },
+                            ),
                           ),
                         ).then((_) {
                           // Refresh list when returning from detail screen
                           _loadAddresses();
                         });
-                      },
-                      onAddressDeleted: () {
-                        // Refresh list when address is deleted
-                        _loadAddresses();
                       },
                       onDeleteTap: () {
                         _showDeleteConfirmation(address);

@@ -31,8 +31,8 @@ class BillService {
         '/get/billhistory',
         headers: _getHeaders(authToken),
         queryParams: {
-          'user_id': request.userId,
-          'user_address_id': request.userAddressId.toString(),
+          'code': request.userCode,
+          'address_code': request.addressCode,
         },
         fromJson: (json) {
           _logger.debug('Raw API response: $json');
@@ -112,7 +112,7 @@ class BillService {
       final response = await _apiService.get<Map<String, dynamic>>(
         '/get/billhistorydetail',
         headers: _getHeaders(authToken),
-        queryParams: {'invoice_id': invoiceId, 'user_id': userId},
+        queryParams: {'code': userId, 'invoice_id': invoiceId},
         fromJson: (json) {
           _logger.debug('Raw response from API: $json');
           if (json is Map<String, dynamic>) {

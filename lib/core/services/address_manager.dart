@@ -17,8 +17,8 @@ class AddressManager {
   /// Get currently selected address
   UserAddress? get selectedAddress => _selectedAddress;
 
-  /// Get selected address ID
-  int? get selectedAddressId => _selectedAddress?.addressId;
+  /// Get selected address code
+  String? get selectedAddressCode => _selectedAddress?.code;
 
   /// Set selected address and notify all listeners
   void setSelectedAddress(UserAddress? address) {
@@ -49,10 +49,10 @@ class AddressManager {
     _notifyListeners();
   }
 
-  /// Load and set first address as default
-  Future<void> loadDefaultAddress(String userId) async {
+  /// Load and set first address as default menggunakan userCode (UUID)
+  Future<void> loadDefaultAddress(String userCode) async {
     try {
-      final result = await AddressService.instance.getUserAddresses(userId);
+      final result = await AddressService.instance.getUserAddresses(userCode);
 
       if (result['success'] == true && result['data'] != null) {
         final List<UserAddress> addresses = result['data'] as List<UserAddress>;
@@ -65,18 +65,18 @@ class AddressManager {
     }
   }
 
-  /// Get address by ID
-  UserAddress? getAddressById(int addressId, List<UserAddress> addresses) {
+  /// Get address by code
+  UserAddress? getAddressByCode(String code, List<UserAddress> addresses) {
     try {
-      return addresses.firstWhere((addr) => addr.addressId == addressId);
+      return addresses.firstWhere((addr) => addr.code == code);
     } catch (e) {
       return null;
     }
   }
 
-  /// Update selected address by ID to ensure consistency
-  void updateSelectedAddressById(int addressId, List<UserAddress> addresses) {
-    final address = getAddressById(addressId, addresses);
+  /// Update selected address by code to ensure consistency
+  void updateSelectedAddressByCode(String code, List<UserAddress> addresses) {
+    final address = getAddressByCode(code, addresses);
     if (address != null) {
       setSelectedAddress(address);
     }

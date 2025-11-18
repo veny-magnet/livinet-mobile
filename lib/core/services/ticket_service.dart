@@ -22,10 +22,10 @@ class TicketService {
         'Fetching ticket history for userId: $userId, userAddressId: $userAddressId',
       );
 
-      final queryParams = <String, String>{'user_id': userId};
+      final queryParams = <String, String>{'code': userId};
 
       if (userAddressId != null && userAddressId.isNotEmpty) {
-        queryParams['user_address_id'] = userAddressId;
+        queryParams['address_code'] = userAddressId;
       }
 
       // Fetch from API
@@ -80,12 +80,12 @@ class TicketService {
       );
 
       final queryParams = <String, String>{
-        'user_id': userId,
+        'code': userId,
         'ticketid': ticketId,
       };
 
       if (userAddressId != null && userAddressId.isNotEmpty) {
-        queryParams['user_address_id'] = userAddressId;
+        queryParams['address_code'] = userAddressId;
       }
 
       final response = await _apiService.get<Map<String, dynamic>>(
@@ -129,14 +129,14 @@ class TicketService {
       _logger.debug('Message: $message');
 
       final body = <String, dynamic>{
-        'user_id': userId,
+        'code': userId,
         'subject': subject,
         'message': message,
       };
 
       // Add optional parameters if provided
       if (userAddressId != null && userAddressId.isNotEmpty) {
-        body['userAddressID'] = userAddressId;
+        body['address_code'] = userAddressId;
       }
       if (subsPlanId != null && subsPlanId.isNotEmpty) {
         body['subsPlanID'] = subsPlanId;

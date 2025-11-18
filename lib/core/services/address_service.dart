@@ -5,8 +5,8 @@ import '../config/app_config.dart';
 import 'app_logger.dart';
 
 class UserAddress {
-  final String userId;
-  final int addressId;
+  final String code; // address_code identifier
+  final String userCode; // user_code identifier
   final String address;
   final String cityName;
   final int stateId;
@@ -17,8 +17,8 @@ class UserAddress {
   final String country;
 
   UserAddress({
-    required this.userId,
-    required this.addressId,
+    required this.code,
+    required this.userCode,
     required this.address,
     required this.cityName,
     required this.stateId,
@@ -31,8 +31,8 @@ class UserAddress {
 
   factory UserAddress.fromJson(Map<String, dynamic> json) {
     return UserAddress(
-      userId: json['user_id'] ?? '',
-      addressId: json['address_id'] ?? 0,
+      code: json['code'] ?? '',
+      userCode: json['user_code'] ?? '',
       address: json['address'] ?? '',
       cityName: json['city_name'] ?? '',
       stateId: json['state_id'] ?? 0,
@@ -46,8 +46,8 @@ class UserAddress {
 
   Map<String, dynamic> toJson() {
     return {
-      'user_id': userId,
-      'address_id': addressId,
+      'code': code,
+      'user_code': userCode,
       'address': address,
       'city_name': cityName,
       'state_id': stateId,
@@ -80,7 +80,7 @@ class AddressService {
 
   /// Get user addresses with authentication - NO CACHE
   Future<Map<String, dynamic>> getUserAddresses(
-    String userId, {
+    String userCode, {
     bool forceRefresh = false,
   }) async {
     try {
@@ -98,7 +98,7 @@ class AddressService {
       final response = await http.get(
         Uri.parse(
           '${_config.baseUrl}/get/listaddress',
-        ).replace(queryParameters: {'user_id': userId}),
+        ).replace(queryParameters: {'code': userCode}),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -158,9 +158,9 @@ class AddressService {
   }
 
   /// Get primary/first address for quick display
-  Future<UserAddress?> getPrimaryAddress(String userId) async {
+  Future<UserAddress?> getPrimaryAddress(String userCode) async {
     try {
-      final result = await getUserAddresses(userId);
+      final result = await getUserAddresses(userCode);
 
       if (result['success'] == true && result['data'] != null) {
         final List<UserAddress> addresses = result['data'];
@@ -174,14 +174,14 @@ class AddressService {
   }
 
   /// Force refresh addresses (bypass cache)
-  Future<Map<String, dynamic>> refreshAddresses(String userId) async {
-    return await getUserAddresses(userId, forceRefresh: true);
+  Future<Map<String, dynamic>> refreshAddresses(String userCode) async {
+    return await getUserAddresses(userCode, forceRefresh: true);
   }
 
-  /// Update existing address
+  /// Update existing address by address_code
   Future<Map<String, dynamic>> updateAddress({
-    required String userId,
-    required int addressId,
+    required String userCode,
+    required String code,
     required String address,
   }) async {
     try {
@@ -196,11 +196,7 @@ class AddressService {
         };
       }
 
-      final body = {
-        'user_id': userId,
-        'address_id': addressId,
-        'address': address,
-      };
+      final body = {'user_code': userCode, 'code': code, 'address': address};
 
       _logger.debug('Updating address with body: $body');
 
@@ -262,7 +258,7 @@ class AddressService {
 
   /// Add new address
   Future<Map<String, dynamic>> addAddress({
-    required String userId,
+    required String userCode,
     required String address,
     required int cityId,
     required int stateId,
@@ -282,7 +278,7 @@ class AddressService {
       }
 
       final body = {
-        'user_id': userId,
+        'user_code': userCode,
         'address': address,
         'city_id': cityId,
         'state_id': stateId,
@@ -345,10 +341,10 @@ class AddressService {
     }
   }
 
-  /// Delete address
+  /// Delete address by address_code
   Future<Map<String, dynamic>> deleteAddress({
-    required String userId,
-    required int addressId,
+    required String userCode, // user_code identifier
+    required String code, // address_code identifier
   }) async {
     try {
       // Get auth token
@@ -362,7 +358,7 @@ class AddressService {
         };
       }
 
-      final body = {'user_id': userId, 'address_id': addressId};
+      final body = {'user_code': userCode, 'code': code};
 
       _logger.debug('Deleting address with body: $body');
 

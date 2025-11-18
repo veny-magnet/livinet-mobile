@@ -46,16 +46,16 @@ class _BillDetailScreenState extends State<BillDetailScreen> {
       });
 
       final userInfo = await _authService.getCurrentUser();
-      final userId = userInfo?['user_id']?.toString();
+      final userCode = userInfo?['code']?.toString(); // UUID dari login
       final authToken = await _authService.getAuthToken();
 
-      if (userId == null) {
-        throw Exception('User ID not found');
+      if (userCode == null) {
+        throw Exception('User code not found');
       }
 
       final detail = await _billService.getBillHistoryDetail(
         invoiceId: widget.invoiceId,
-        userId: userId,
+        userId: userCode,
         authToken: authToken,
       );
 

@@ -61,11 +61,13 @@ class AuthService {
         await _sessionManager.startSession();
 
         // Set user identifier for crash reports
-        if (responseData['data']['user_id'] != null) {
+        if (responseData['data']['code'] != null) {
           _logger.setUserIdentifier(
-            responseData['data']['user_id'].toString(),
+            responseData['data']['code'].toString(),
             email: responseData['data']['email'],
-            name: responseData['data']['name'],
+            name:
+                '${responseData['data']['first_name'] ?? ''} ${responseData['data']['last_name'] ?? ''}'
+                    .trim(),
           );
         }
 
@@ -94,7 +96,7 @@ class AuthService {
 
   // Send email verification
   Future<Map<String, dynamic>> sendEmailVerification({
-    required String userId,
+    required String code,
   }) async {
     try {
       final response = await http.post(
@@ -107,7 +109,7 @@ class AuthService {
         body: jsonEncode({
           'name_server': apiServer,
           'key_server': apiKey,
-          'user_id': userId,
+          'code': code,
         }),
       );
 
@@ -208,6 +210,8 @@ class AuthService {
       'Saving user session with data keys: ${userData.keys.toList()}',
     );
 
+    await _secureStorage.clearUserData();
+
     // Save token to secure storage
     if (userData['token'] != null) {
       await _secureStorage.saveAccessToken(userData['token']);
@@ -221,9 +225,13 @@ class AuthService {
       await _secureStorage.saveRefreshToken(userData['refresh_token']);
     }
 
-    // Save user ID
-    if (userData['user_id'] != null) {
-      await _secureStorage.saveUserId(userData['user_id'].toString());
+    if (userData['code'] != null) {
+      await _secureStorage.saveUserCode(userData['code'].toString());
+      _logger.info('User code (UUID) saved successfully');
+    } else {
+      _logger.warning(
+        'No code (UUID) found in login response - authentication may fail',
+      );
     }
 
     // Save user email
@@ -232,7 +240,15 @@ class AuthService {
     }
 
     // Save user name
-    if (userData['name'] != null) {
+    if (userData['first_name'] != null || userData['last_name'] != null) {
+      final fullName =
+          '${userData['first_name'] ?? ''} ${userData['last_name'] ?? ''}'
+              .trim();
+      if (fullName.isNotEmpty) {
+        await _secureStorage.saveUserName(fullName);
+      }
+    } else if (userData['name'] != null) {
+      // Fallback to 'name' field if it exists
       await _secureStorage.saveUserName(userData['name']);
     }
 

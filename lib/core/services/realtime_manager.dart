@@ -35,16 +35,16 @@ class RealtimeManager {
         return;
       }
 
-      final userId = currentUser['user_id'] as String?;
+      final userId = currentUser['code'] as String?;
       if (userId == null) {
-        _logger.warning('Cannot initialize realtime: No user ID');
+        _logger.warning('Cannot initialize realtime: No user code');
         return;
       }
 
       // Register callbacks
       _registerCallbacks(context);
 
-      // Connect to WebSocket
+      // Connect to WebSocket menggunakan userCode (UUID)
       await _realtimeService.connect(userId, token);
 
       _isInitialized = true;

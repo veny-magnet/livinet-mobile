@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../core/services/address_service.dart';
-// ProductService import removed - no longer needed
 import '../../core/services/location_service.dart';
 import '../../core/widgets/confirmation_dialog.dart';
 import '../../core/models/state_model.dart';
@@ -11,9 +10,9 @@ import '../../core/widgets/app_dropdown_input.dart';
 import '../../core/widgets/app_button.dart';
 
 class AddAddressScreen extends StatefulWidget {
-  final String userId;
+  final String userCode; // UUID identifier
 
-  const AddAddressScreen({super.key, required this.userId});
+  const AddAddressScreen({super.key, required this.userCode});
 
   @override
   State<AddAddressScreen> createState() => _AddAddressScreenState();
@@ -158,7 +157,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
     try {
       final result = await AddressService.instance.addAddress(
-        userId: widget.userId,
+        userCode: widget.userCode,
         address: _addressController.text.trim(),
         cityId: _selectedCity!.id,
         stateId: _selectedState!.id,
@@ -203,135 +202,155 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leadingWidth: 40,
-        leading: IconButton(
-          onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
-        ),
-        titleSpacing: 0,
-        title: const Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Add Address',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.black,
-              fontFamily: 'Open Sans',
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: Colors.white,
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            leadingWidth: 40,
+            leading: IconButton(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(
+                Icons.arrow_back_ios,
+                color: Colors.black,
+                size: 20,
+              ),
+            ),
+            titleSpacing: 0,
+            title: const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Add Address',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                  fontFamily: 'Open Sans',
+                ),
+              ),
+            ),
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  // State Dropdown
+                  DropdownInput<StateModel>(
+                    icon: Icons.map_outlined,
+                    hintText: 'Province',
+                    value: _selectedState,
+                    items: _states.map((state) {
+                      return DropdownMenuItem<StateModel>(
+                        value: state,
+                        child: Text(state.name),
+                      );
+                    }).toList(),
+                    onChanged: (state) {
+                      if (_isLoadingStates) return;
+                      setState(() {
+                        _selectedState = state;
+                        _selectedCity = null;
+                        _selectedArea = null;
+                        _cities = [];
+                        _areas = [];
+                      });
+                      if (state != null) {
+                        _loadCities(state.id);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // City Dropdown
+                  DropdownInput<CityModel>(
+                    icon: Icons.location_city_outlined,
+                    hintText: 'City',
+                    value: _selectedCity,
+                    items: _cities.map((city) {
+                      return DropdownMenuItem<CityModel>(
+                        value: city,
+                        child: Text(city.name),
+                      );
+                    }).toList(),
+                    onChanged: (city) {
+                      if (_isLoadingCities || _selectedState == null) return;
+                      setState(() {
+                        _selectedCity = city;
+                        _selectedArea = null;
+                        _areas = [];
+                      });
+                      if (city != null) {
+                        _loadAreas(city.id);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Area Dropdown
+                  DropdownInput<AreaModel>(
+                    icon: Icons.my_location_outlined,
+                    hintText: 'Location',
+                    value: _selectedArea,
+                    items: _areas.map((area) {
+                      return DropdownMenuItem<AreaModel>(
+                        value: area,
+                        child: Text(area.areaName),
+                      );
+                    }).toList(),
+                    onChanged: (area) {
+                      if (_isLoadingAreas || _selectedCity == null) return;
+                      setState(() {
+                        _selectedArea = area;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Address TextField
+                  TextInput(
+                    icon: Icons.home_outlined,
+                    hintText: 'Address',
+                    controller: _addressController,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Postcode TextField
+                  TextInput(
+                    icon: Icons.local_post_office_outlined,
+                    hintText: 'Postcode',
+                    controller: _postcodeController,
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 30),
+
+                  // Add Address Button
+                  AppButton(
+                    text: _isLoading ? 'Adding...' : 'Add Address',
+                    onPressed: _isLoading ? null : _addAddress,
+                    isPrimary: true,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              // State Dropdown
-              DropdownInput<StateModel>(
-                icon: Icons.map_outlined,
-                hintText: 'Province',
-                value: _selectedState,
-                items: _states.map((state) {
-                  return DropdownMenuItem<StateModel>(
-                    value: state,
-                    child: Text(state.name),
-                  );
-                }).toList(),
-                onChanged: (state) {
-                  if (_isLoadingStates) return;
-                  setState(() {
-                    _selectedState = state;
-                    _selectedCity = null;
-                    _selectedArea = null;
-                    _cities = [];
-                    _areas = [];
-                  });
-                  if (state != null) {
-                    _loadCities(state.id);
-                  }
-                },
+        // Loading overlay
+        if (_isLoading)
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withOpacity(0.3),
+              child: const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4CB04C)),
+                ),
               ),
-              const SizedBox(height: 16),
-
-              // City Dropdown
-              DropdownInput<CityModel>(
-                icon: Icons.location_city_outlined,
-                hintText: 'City',
-                value: _selectedCity,
-                items: _cities.map((city) {
-                  return DropdownMenuItem<CityModel>(
-                    value: city,
-                    child: Text(city.name),
-                  );
-                }).toList(),
-                onChanged: (city) {
-                  if (_isLoadingCities || _selectedState == null) return;
-                  setState(() {
-                    _selectedCity = city;
-                    _selectedArea = null;
-                    _areas = [];
-                  });
-                  if (city != null) {
-                    _loadAreas(city.id);
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Area Dropdown
-              DropdownInput<AreaModel>(
-                icon: Icons.my_location_outlined,
-                hintText: 'Location',
-                value: _selectedArea,
-                items: _areas.map((area) {
-                  return DropdownMenuItem<AreaModel>(
-                    value: area,
-                    child: Text(area.areaName),
-                  );
-                }).toList(),
-                onChanged: (area) {
-                  if (_isLoadingAreas || _selectedCity == null) return;
-                  setState(() {
-                    _selectedArea = area;
-                  });
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Address TextField
-              TextInput(
-                icon: Icons.home_outlined,
-                hintText: 'Address',
-                controller: _addressController,
-              ),
-              const SizedBox(height: 16),
-
-              // Postcode TextField
-              TextInput(
-                icon: Icons.local_post_office_outlined,
-                hintText: 'Postcode',
-                controller: _postcodeController,
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 30),
-
-              // Add Address Button
-              AppButton(
-                text: _isLoading ? 'Adding...' : 'Add Address',
-                onPressed: _isLoading ? null : _addAddress,
-                isPrimary: true,
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+      ],
     );
   }
 }

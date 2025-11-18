@@ -45,12 +45,36 @@ class _MakeTicketScreenState extends State<MakeTicketScreen> {
       _isLoading = true;
     });
 
+    // Show loading dialog
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const Dialog(
+            child: Padding(
+              padding: EdgeInsets.all(20.0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Text('Submitting ticket...'),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    }
+
     try {
       final userInfo = await _authService.getCurrentUser();
-      final userId = userInfo?['user_id']?.toString();
+      final userCode = userInfo?['code']
+          ?.toString(); // UUID dari login response
 
-      if (userId == null) {
-        throw Exception('User ID not found. Please login again.');
+      if (userCode == null) {
+        throw Exception('User code not found. Please login again.');
       }
 
       // Get user's address and subscription info
@@ -58,8 +82,10 @@ class _MakeTicketScreenState extends State<MakeTicketScreen> {
       String? subsPlanId;
 
       try {
-        // Get default address
-        final addressResponse = await _addressService.getUserAddresses(userId);
+        // Get default address menggunakan userCode (UUID)
+        final addressResponse = await _addressService.getUserAddresses(
+          userCode,
+        );
         if (addressResponse['success'] && addressResponse['data'] != null) {
           final addresses = addressResponse['data']['user_addresses'] as List?;
           if (addresses != null && addresses.isNotEmpty) {
@@ -72,9 +98,9 @@ class _MakeTicketScreenState extends State<MakeTicketScreen> {
       }
 
       try {
-        // Get active subscription
+        // Get active subscription menggunakan userCode (UUID)
         final subscriptionResponse = await _subscriptionService
-            .getUserSubscriptions(userId);
+            .getUserSubscriptions(userCode);
         if (subscriptionResponse['success'] &&
             subscriptionResponse['data'] != null) {
           final subscriptions =
@@ -89,7 +115,7 @@ class _MakeTicketScreenState extends State<MakeTicketScreen> {
       }
 
       final response = await _ticketService.openTicket(
-        userId: userId,
+        userId: userCode,
         subject: _titleController.text,
         message: _descriptionController.text,
         userAddressId: userAddressId,
@@ -100,40 +126,58 @@ class _MakeTicketScreenState extends State<MakeTicketScreen> {
             .substring(0, 19),
       );
 
+      // Close loading dialog
+      if (mounted) {
+        Navigator.pop(context);
+      }
+
       setState(() {
         _isLoading = false;
       });
 
       if (response['success']) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Ticket submitted successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Ticket submitted successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
 
         // Clear form
         _titleController.clear();
         _descriptionController.clear();
 
         // Navigate back
-        Navigator.pop(context, true); // Pass true to indicate success
+        if (mounted) {
+          Navigator.pop(context, true); // Pass true to indicate success
+        }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to submit ticket: ${response['message']}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to submit ticket: ${response['message']}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
+      // Close loading dialog
+      if (mounted) {
+        Navigator.pop(context);
+      }
+
       setState(() {
         _isLoading = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 

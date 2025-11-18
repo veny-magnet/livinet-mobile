@@ -7,10 +7,12 @@ import '../../core/widgets/app_dropdown_input.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/registration_service.dart';
 import '../../core/services/signup_form_service.dart';
+import '../../core/services/fcm_service.dart';
+import '../../core/services/auth_service.dart';
+import '../../core/services/app_logger.dart';
 import '../../core/models/state_model.dart';
 import '../../core/models/city_model.dart';
 import '../../core/models/area_model.dart';
-import 'ktp_capture_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -25,7 +27,8 @@ class _SignupScreenState extends State<SignupScreen> {
 
   // Form controllers
   final _referralCodeController = TextEditingController();
-  final _usernameController = TextEditingController();
+  final _firstnameController = TextEditingController();
+  final _lastnameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -37,6 +40,8 @@ class _SignupScreenState extends State<SignupScreen> {
   final LocationService _locationService = LocationService();
   final RegistrationService _registrationService = RegistrationService();
   final SignupFormService _formService = SignupFormService();
+  final AuthService _authService = AuthService();
+  final AppLogger _logger = AppLogger.instance;
 
   // Location data with caching
   List<StateModel> _states = [];
@@ -61,7 +66,8 @@ class _SignupScreenState extends State<SignupScreen> {
   /// Restore form data from SignupFormService
   void _restoreFormData() {
     _referralCodeController.text = _formService.referralCode;
-    _usernameController.text = _formService.username;
+    _firstnameController.text = _formService.firstname;
+    _lastnameController.text = _formService.lastname;
     _emailController.text = _formService.email;
     _phoneController.text = _formService.phone;
     _passwordController.text = _formService.password;
@@ -81,7 +87,8 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   void dispose() {
     _referralCodeController.dispose();
-    _usernameController.dispose();
+    _firstnameController.dispose();
+    _lastnameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -186,7 +193,8 @@ class _SignupScreenState extends State<SignupScreen> {
   /// Save current form data to service
   void _saveFormData() {
     _formService.setReferralCode(_referralCodeController.text);
-    _formService.setUsername(_usernameController.text);
+    _formService.setFirstname(_firstnameController.text);
+    _formService.setLastname(_lastnameController.text);
     _formService.setEmail(_emailController.text);
     _formService.setPhone(_phoneController.text);
     _formService.setPassword(_passwordController.text);
@@ -198,15 +206,15 @@ class _SignupScreenState extends State<SignupScreen> {
     _formService.setSelectedArea(_selectedArea);
   }
 
-  /// Validate form and navigate to KTP capture
+  /// Validate form and register directly to API
   void _onNext() async {
     if (!_validateForm()) return;
 
-    // Save form data before navigating
+    // Save form data
     _saveFormData();
 
-    // Show loading dialog for email validation
-    _showLoadingDialog('Validating email...');
+    // Show loading dialog
+    _showLoadingDialog('Creating account...');
 
     try {
       // Validate email availability
@@ -214,8 +222,9 @@ class _SignupScreenState extends State<SignupScreen> {
         _emailController.text.trim(),
       );
 
-      // Close loading dialog
-      if (mounted) Navigator.of(context).pop();
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
 
       if (!emailValidation['success']) {
         _showError(emailValidation['message'] ?? 'Unable to validate email');
@@ -227,39 +236,96 @@ class _SignupScreenState extends State<SignupScreen> {
         return;
       }
 
-      // Email is available, proceed to KTP capture
-      final registrationData = {
-        'username': _usernameController.text.trim(),
-        'email': _emailController.text.trim(),
-        'phone': _phoneController.text.trim(),
-        'password': _passwordController.text,
-        'address': _addressController.text.trim(),
-        'postcode': _postcodeController.text.trim(),
-        'referral_code': _referralCodeController.text.trim(),
-        'state_id': _selectedState!.id,
-        'state_name': _selectedState!.name,
-        'city_id': _selectedCity!.id,
-        'city_name': _selectedCity!.name,
-        'area_id': _selectedArea!.id,
-        'area_name': _selectedArea!.areaName,
-      };
+      _showLoadingDialog('Creating your account');
 
-      // Navigate to KTP capture screen
-      if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) =>
-                KtpCaptureScreen(registrationData: registrationData),
-          ),
-        );
+      // Get FCM token
+      String? fcmToken = await FcmService.getFcmToken();
+
+      // Build registration data
+      final registrationData = _registrationService.buildRegistrationData(
+        firstname: _firstnameController.text.trim(),
+        lastname: _lastnameController.text.trim(),
+        phone: _phoneController.text.trim(),
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        address: _addressController.text.trim(),
+        cityId: _selectedCity!.id,
+        stateId: _selectedState!.id,
+        areaId: _selectedArea!.id,
+        postcode: _postcodeController.text.trim(),
+        fcmToken: fcmToken,
+      );
+
+      // Validate registration data
+      final errors = _registrationService.validateRegistrationData(
+        registrationData,
+      );
+
+      if (errors.isNotEmpty) {
+        if (mounted && Navigator.canPop(context)) {
+          Navigator.of(context).pop();
+        }
+        _showError(errors.values.first);
+        return;
       }
-    } catch (e) {
-      // Close loading dialog if still open
+
+      final result = await _registrationService.registration(
+        registrationData: registrationData,
+      );
+
       if (mounted && Navigator.canPop(context)) {
         Navigator.of(context).pop();
       }
-      _showError('Error validating email: $e');
+
+      if (!result['success']) {
+        _showError(result['message'] ?? 'Registration failed');
+        return;
+      }
+
+      // Log registration response for debugging
+      _logger.info('Registration response data: ${result['data']}');
+
+      // Trigger email verification API
+      if (result['data'] != null && result['data']['code'] != null) {
+        _logger.info(
+          'Sending email verification with code: ${result['data']['code']}',
+        );
+
+        _showLoadingDialog('Sending verification email...');
+
+        final verificationResult = await _authService.sendEmailVerification(
+          code: result['data']['code'].toString(),
+        );
+
+        _logger.info('Email verification result: $verificationResult');
+
+        if (mounted && Navigator.canPop(context)) {
+          Navigator.of(context).pop();
+        }
+
+        if (!verificationResult['success']) {
+          _logger.warning(
+            'Email verification request failed: ${verificationResult['message']}',
+          );
+        }
+      } else {
+        _logger.warning(
+          'No code found in registration response: ${result['data']}',
+        );
+      }
+
+      // Clear saved form data after successful registration
+      SignupFormService().clearFormData();
+
+      // Show success dialog
+      if (mounted) {
+        _showSuccessDialog();
+      }
+    } catch (e) {
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+      _showError('Error: $e');
     }
   }
 
@@ -273,8 +339,115 @@ class _SignupScreenState extends State<SignupScreen> {
             children: [
               const CircularProgressIndicator(),
               const SizedBox(width: 16),
-              Text(message),
+              Expanded(child: Text(message)),
             ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showSuccessDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return WillPopScope(
+          onWillPop: () async => false,
+          child: Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.email_outlined,
+                      size: 40,
+                      color: Colors.green,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Registration Successful!',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Open Sans',
+                      color: Colors.black87,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Please check your email to verify your account.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'Open Sans',
+                      color: Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'A verification link has been sent to:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'Open Sans',
+                      color: Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _emailController.text.trim(),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'Open Sans',
+                      fontWeight: FontWeight.w600,
+                      color: Colors.green,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        context.go('/login');
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Go to Login',
+                        style: TextStyle(
+                          fontFamily: 'Open Sans',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         );
       },
@@ -284,7 +457,8 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _validateForm() {
     // Build registration data for validation
     final registrationData = {
-      'username': _usernameController.text.trim(),
+      'firstname': _firstnameController.text.trim(),
+      'lastname': _lastnameController.text.trim(),
       'email': _emailController.text.trim(),
       'phone': _phoneController.text.trim(),
       'password': _passwordController.text,
@@ -672,8 +846,14 @@ class _SignupScreenState extends State<SignupScreen> {
                           children: [
                             TextInput(
                               icon: Icons.person_outline,
-                              hintText: "Username",
-                              controller: _usernameController,
+                              hintText: "First Name",
+                              controller: _firstnameController,
+                            ),
+                            const SizedBox(height: 16),
+                            TextInput(
+                              icon: Icons.person_outline,
+                              hintText: "Last Name",
+                              controller: _lastnameController,
                             ),
                             const SizedBox(height: 16),
                             TextInput(
@@ -792,12 +972,6 @@ class _SignupScreenState extends State<SignupScreen> {
                               hintText: "Postcode",
                               controller: _postcodeController,
                               keyboardType: TextInputType.number,
-                            ),
-                            const SizedBox(height: 16),
-                            TextInput(
-                              icon: Icons.card_giftcard,
-                              hintText: "Referral Code (Optional)",
-                              controller: _referralCodeController,
                             ),
                             const SizedBox(height: 10),
                             Row(

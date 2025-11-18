@@ -24,7 +24,7 @@ class AddressCard extends StatelessWidget {
 
     try {
       return subscriptions!.firstWhere(
-        (sub) => sub['address']?['addressId'] == address.addressId,
+        (sub) => sub['address']?['code'] == address.code,
         orElse: () => null,
       );
     } catch (e) {

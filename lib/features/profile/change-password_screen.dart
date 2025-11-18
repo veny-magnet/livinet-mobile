@@ -4,6 +4,7 @@ import '../../core/services/profile_update_service.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_text_input.dart' as custom_widgets;
+import '../../core/widgets/confirmation_dialog.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({Key? key}) : super(key: key);
@@ -24,9 +25,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   bool _isLoading = false;
 
   // Password strength variables
-  double _passwordStrength = 0.0;
-  String _passwordStrengthText = '';
-  Color _passwordStrengthColor = Colors.red;
 
   @override
   void initState() {
@@ -44,21 +42,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   void _checkPasswordStrength() {
     String password = _newPasswordController.text;
-    double strength = 0.0;
-    String strengthText = '';
-    Color strengthColor = Colors.red;
-
+    // Password strength logic - just checking without storing unused variables
     if (password.isEmpty) {
-      strength = 0.0;
-      strengthText = '';
+      // No action needed
     } else if (password.length < 6) {
-      strength = 0.2;
-      strengthText = 'Very Weak';
-      strengthColor = Colors.red;
+      // Very weak
     } else if (password.length < 8) {
-      strength = 0.4;
-      strengthText = 'Weak';
-      strengthColor = Colors.orange;
+      // Weak
     } else {
       // Check for various criteria
       bool hasUppercase = password.contains(RegExp(r'[A-Z]'));
@@ -75,55 +65,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       if (hasSpecialCharacters) criteriaCount++;
 
       if (criteriaCount >= 3 && password.length >= 8) {
-        strength = 1.0;
-        strengthText = 'Very Strong';
-        strengthColor = const Color(0xFF4CB04C);
+        // Very strong
       } else if (criteriaCount >= 2) {
-        strength = 0.8;
-        strengthText = 'Strong';
-        strengthColor = Colors.green;
+        // Strong
       } else {
-        strength = 0.6;
-        strengthText = 'Medium';
-        strengthColor = Colors.yellow[700]!;
+        // Medium
       }
     }
-
-    setState(() {
-      _passwordStrength = strength;
-      _passwordStrengthText = strengthText;
-      _passwordStrengthColor = strengthColor;
-    });
-  }
-
-  String? _validateCurrentPassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Current password is required';
-    }
-    return null;
-  }
-
-  String? _validateNewPassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'New password is required';
-    }
-    if (value.length < 8) {
-      return 'Password must be at least 8 characters';
-    }
-    if (value == _currentPasswordController.text) {
-      return 'New password must be different from current password';
-    }
-    return null;
-  }
-
-  String? _validateConfirmPassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Password confirmation is required';
-    }
-    if (value != _newPasswordController.text) {
-      return 'Password confirmation does not match';
-    }
-    return null;
   }
 
   Future<void> _changePassword() async {
@@ -143,7 +91,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       final authService = AuthService();
       final currentUser = await authService.getCurrentUser();
 
-      if (currentUser == null || currentUser['user_id'] == null) {
+      if (currentUser == null || currentUser['code'] == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -170,7 +118,17 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         return;
       }
 
-      final userId = currentUser['user_id'] as String;
+      final userId = currentUser['code'] as String;
+
+      // Show loading dialog
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) =>
+              const Center(child: CircularProgressIndicator()),
+        );
+      }
 
       // Call the manual password change API (not reset)
       final result = await ProfileUpdateService.instance.changePassword(
@@ -180,103 +138,53 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         confirmPassword: _confirmPasswordController.text,
       );
 
+      // Close loading dialog
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
       if (mounted) {
         if (result['success'] == true) {
-          // Show success dialog
-          await showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                title: const Row(
-                  children: [
-                    Icon(
-                      Icons.check_circle,
-                      color: Color(0xFF4CB04C),
-                      size: 28,
-                    ),
-                    SizedBox(width: 12),
-                    Text(
-                      'Success',
-                      style: TextStyle(
-                        fontFamily: 'Open Sans',
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                content: Text(
-                  result['message'] ?? 'Password changed successfully',
-                  style: const TextStyle(
-                    fontFamily: 'Open Sans',
-                    fontSize: 14,
-                    height: 1.4,
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text(
-                      'OK',
-                      style: TextStyle(
-                        fontFamily: 'Open Sans',
-                        color: Color(0xFF4CB04C),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              );
+          // Show success dialog using DialogHelper
+          DialogHelper.showSuccess(
+            context,
+            title: 'Success',
+            message: result['message'] ?? 'Password changed successfully!',
+            onConfirm: () {
+              Navigator.of(context).pop();
             },
           );
+
+          // Clear form
+          _currentPasswordController.clear();
+          _newPasswordController.clear();
+          _confirmPasswordController.clear();
         } else {
           // Show error message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.error, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      result['message'] ?? 'Failed to change password',
-                    ),
-                  ),
-                ],
-              ),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
+          DialogHelper.showError(
+            context,
+            title: 'Error',
+            message: result['message'] ?? 'Failed to change password',
+            onConfirm: () {},
           );
         }
       }
     } catch (e) {
+      // Close loading dialog if still open
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(child: Text('Network error: ${e.toString()}')),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
+        try {
+          Navigator.of(context).pop();
+        } catch (e) {
+          // Dialog might not be open
+        }
+      }
+
+      if (mounted) {
+        DialogHelper.showError(
+          context,
+          title: 'Error',
+          message: 'An error occurred: $e',
+          onConfirm: () {},
         );
       }
     } finally {
@@ -291,22 +199,26 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         elevation: 0,
+        leadingWidth: 40,
         leading: IconButton(
           onPressed: () => Navigator.of(context).pop(),
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
         ),
         titleSpacing: 0,
-        title: const Text(
-          'Change Password',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
-            fontFamily: 'Open Sans',
+        title: const Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Change Password',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.black,
+              fontFamily: 'Open Sans',
+            ),
           ),
         ),
       ),

@@ -10,7 +10,9 @@ import '../../core/widgets/no_plan_widget.dart';
 import '../../core/services/user_profile_service.dart';
 import '../../core/services/address_service.dart';
 import '../../core/services/order_details_service.dart';
+import '../../core/services/ktp_service.dart';
 import '../../core/services/address_manager.dart';
+import '../../core/services/auth_service.dart';
 import '../../core/models/order_detail_models.dart' as order_detail;
 
 class HomeScreen extends StatefulWidget {
@@ -25,15 +27,17 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String username = 'Loading...';
   String userId = '';
+  String userCode = ''; // UUID from login
   int points = 0;
   String status = '';
   bool isLoading = true;
   bool _isLoadingProfile = false;
   bool _hasRefreshed = false;
+  bool hasKtpData = false;
   order_detail.OrderDetailsResponse? orderDetailsData;
   order_detail.OrderDetail? currentOrderDetail;
   String errorMessage = '';
-  int? selectedAddressId;
+  String? selectedAddressCode;
   String currentPlanName = 'Your Current Plan';
 
   @override
@@ -86,20 +90,48 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
 
     try {
-      // Get user data from auth service or current session
+      // First, get current user to get code
+      final authService = AuthService();
+      final currentUser = await authService.getCurrentUser();
+
+      if (currentUser == null || currentUser['code'] == null) {
+        username = 'User';
+        userId = '';
+        points = 0;
+        status = '';
+        hasKtpData = false;
+        setState(() {
+          isLoading = false;
+        });
+        return;
+      }
+
+      String userCode = currentUser['code'];
+
+      // Get KTP data first
+      final ktpResult = await KtpService().getKtpData(userCode: userCode);
+      if (ktpResult['success'] == true && ktpResult['data'] != null) {
+        hasKtpData = true;
+      } else {
+        hasKtpData = false;
+      }
+
+      // Then get user profile
       final result = await UserProfileService.instance.getCurrentUserProfile();
 
       if (result['success'] == true && result['data'] != null) {
         final data = result['data'];
-        // Don't call setState here - will be called once at the end
         username = data.username ?? 'User';
         userId = data.userId ?? '';
         points = data.points ?? 0;
         status = data.status ?? '';
 
-        // Load bill history if user is verified and has userId
-        if (status == 'verified' && userId.isNotEmpty) {
-          await _loadOrderDetails();
+        // Store userCode state for later use
+        this.userCode = userCode;
+
+        // Load bill history only if user is verified and has userCode
+        if (status == 'verified' && userCode.isNotEmpty) {
+          await _loadOrderDetails(userCode);
         }
 
         setState(() {
@@ -119,6 +151,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       userId = '';
       points = 0;
       status = '';
+      hasKtpData = false;
       setState(() {
         isLoading = false;
       });
@@ -127,71 +160,50 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _loadOrderDetails() async {
+  Future<void> _loadOrderDetails(String userCode, {String? addressCode}) async {
     try {
-      if (userId.isEmpty) {
-        errorMessage = 'User ID not available';
+      if (userCode.isEmpty) {
+        errorMessage = 'User code not available';
         return;
       }
 
-      // Get user addresses first
-      final addressResult = await AddressService.instance.getUserAddresses(
-        userId,
-      );
+      // If no specific address code provided, load addresses first
+      if (addressCode == null) {
+        final addressResult = await AddressService.instance.getUserAddresses(
+          userCode,
+        );
 
-      if (addressResult['success'] == true && addressResult['data'] != null) {
-        final List<UserAddress> addresses =
-            addressResult['data'] as List<UserAddress>;
-        if (addresses.isNotEmpty) {
-          final firstAddress = addresses.first;
-          selectedAddressId = firstAddress.addressId;
-          AddressManager.instance.setSelectedAddress(firstAddress);
-
-          // Only load OrderDetails
-          final orderDetailsResponse = await OrderDetailsService.instance
-              .getOrderDetails(
-                userId: userId,
-                userAddressId: selectedAddressId!,
-              );
-
-          // Use OrderDetails if available
-          if (orderDetailsResponse != null &&
-              orderDetailsResponse.orders.isNotEmpty) {
-            orderDetailsData = orderDetailsResponse;
-            currentOrderDetail = orderDetailsResponse.orders.first;
-            await _loadCurrentPlanName();
+        if (addressResult['success'] == true && addressResult['data'] != null) {
+          final List<UserAddress> addresses =
+              addressResult['data'] as List<UserAddress>;
+          if (addresses.isNotEmpty) {
+            final firstAddress = addresses.first;
+            selectedAddressCode = firstAddress.code;
+            AddressManager.instance.setSelectedAddress(firstAddress);
+            addressCode = firstAddress.code;
           }
         }
       }
-    } catch (e) {
-      errorMessage = 'Error loading order details: $e';
-    }
-  }
 
-  Future<void> _loadOrderDetailsForAddress(int addressId) async {
-    try {
-      if (userId.isEmpty) {
-        errorMessage = 'User ID not available';
-        return;
-      }
+      // Load OrderDetails with the determined address code
+      if (addressCode != null && addressCode.isNotEmpty) {
+        final orderDetailsResponse = await OrderDetailsService.instance
+            .getOrderDetails(userId: userCode, userAddressId: addressCode);
 
-      // Only load OrderDetails for the selected address (no need to reload addresses)
-      final orderDetailsResponse = await OrderDetailsService.instance
-          .getOrderDetails(userId: userId, userAddressId: addressId);
-
-      // Use OrderDetails if available
-      if (orderDetailsResponse != null &&
-          orderDetailsResponse.orders.isNotEmpty) {
-        setState(() {
-          orderDetailsData = orderDetailsResponse;
-          currentOrderDetail = orderDetailsResponse.orders.first;
-        });
-        await _loadCurrentPlanName();
-      } else {
-        setState(() {
-          currentOrderDetail = null;
-          orderDetailsData = null;
-        });
+        // Use OrderDetails if available
+        if (orderDetailsResponse != null &&
+            orderDetailsResponse.orders.isNotEmpty) {
+          setState(() {
+            orderDetailsData = orderDetailsResponse;
+            currentOrderDetail = orderDetailsResponse.orders.first;
+          });
+          await _loadCurrentPlanName();
+        } else {
+          setState(() {
+            currentOrderDetail = null;
+            orderDetailsData = null;
+          });
+        }
       }
     } catch (e) {
       errorMessage = 'Error loading order details: $e';
@@ -200,7 +212,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _loadCurrentPlanName() async {
     try {
-      if (userId.isNotEmpty && selectedAddressId != null) {
+      if (userCode.isNotEmpty && selectedAddressCode != null) {
         // Check if we already have plan name from currentOrderDetail
         if (currentOrderDetail != null) {
           final planName =
@@ -269,13 +281,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                 fontFamily: 'Open Sans',
                               ),
                             ),
+                            const SizedBox(height: 6),
                             if (!isLoading) ...[
-                              if (status == 'not_verified')
+                              if (!hasKtpData)
+                                Text(
+                                  'Upload ID Card to activate your account',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: const Color(0xFFDC6E6E),
+                                    fontFamily: 'Open Sans',
+                                  ),
+                                )
+                              else if (status == 'not_verified')
                                 Text(
                                   'Waiting for admin verification',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
                                     color: const Color(0xFFDC6E6E),
                                     fontFamily: 'Open Sans',
                                   ),
@@ -323,16 +350,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   // Show AddressSelector and BillCard only if user is verified
                   if (status == 'verified') ...[
                     AddressSelector(
-                      userId: userId.isNotEmpty ? userId : '',
+                      userCode: userCode.isNotEmpty ? userCode : '',
                       defaultAddress: '',
                       onAddressSelected: (selectedAddress) async {
                         setState(() {
-                          selectedAddressId = selectedAddress.addressId;
+                          selectedAddressCode = selectedAddress.code;
                         });
 
                         // Load only OrderDetails for the selected address
-                        await _loadOrderDetailsForAddress(
-                          selectedAddress.addressId,
+                        await _loadOrderDetails(
+                          userCode,
+                          addressCode: selectedAddress.code,
                         );
                       },
                     ),
@@ -342,8 +370,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     currentOrderDetail != null
                         ? BillCard.fromOrderDetail(
                             orderDetail: currentOrderDetail!,
-                            userId: userId,
-                            userAddressId: selectedAddressId,
+                            userId: userCode,
+                            userAddressId: selectedAddressCode,
                           )
                         : const NoPlanWidget(),
                   ],

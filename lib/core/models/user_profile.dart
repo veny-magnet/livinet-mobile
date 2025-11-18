@@ -82,12 +82,18 @@ class UserProfile {
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
-    // Print received JSON for debugging
+    // Generate username from first_name and last_name if username is not available
+    String username = _safeGet(json, 'username', '');
+    if (username.isEmpty) {
+      final firstName = _safeGet(json, 'first_name', '');
+      final lastName = _safeGet(json, 'last_name', '');
+      username = '$firstName $lastName'.trim();
+    }
 
     return UserProfile(
       id: _safeGet(json, 'id', 0),
       userId: _safeGet(json, 'user_id', ''),
-      username: _safeGet(json, 'username', ''),
+      username: username,
       phone: _safeGet(json, 'phone', ''),
       email: _safeGet(json, 'email', ''),
       emailVerifiedAt: _safeGet(json, 'email_verified_at', null),

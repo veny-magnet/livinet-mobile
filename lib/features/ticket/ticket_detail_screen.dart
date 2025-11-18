@@ -38,14 +38,14 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       });
 
       final userInfo = await _authService.getCurrentUser();
-      final userId = userInfo?['user_id']?.toString();
+      final userCode = userInfo?['code']?.toString(); // UUID dari login
 
-      if (userId == null) {
-        throw Exception('User ID not found');
+      if (userCode == null) {
+        throw Exception('User code not found');
       }
 
       final response = await _ticketService.getTicketDetail(
-        userId: userId,
+        userId: userCode,
         ticketId: widget.ticketId,
       );
 
@@ -265,75 +265,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           fontWeight: FontWeight.w600,
           fontFamily: 'Open Sans',
         ),
-      ),
-    );
-  }
-
-  Widget _buildTicketContent() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Icon + Name + Date inline
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Icon with circle background
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.person_outline,
-                  color: Colors.grey.shade600,
-                  size: 16,
-                ),
-              ),
-              const SizedBox(width: 10),
-              // Name
-              Expanded(
-                child: Text(
-                  ticketDetail!['name'] ??
-                      ticketDetail!['requestor_name'] ??
-                      'User',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                    fontFamily: 'Open Sans',
-                  ),
-                ),
-              ),
-              // Date
-              Text(
-                _ticketService.formatTicketDate(ticketDetail!['date']),
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 12,
-                  fontFamily: 'Open Sans',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Description (indented to align with name)
-          Padding(
-            padding: const EdgeInsets.only(left: 38),
-            child: Text(
-              ticketDetail!['description'] ?? 'No description available',
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.black87,
-                height: 1.6,
-                fontFamily: 'Open Sans',
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

@@ -37,13 +37,13 @@ class _TicketListScreenState extends State<TicketListScreen>
       });
 
       final userInfo = await _authService.getCurrentUser();
-      final userId = userInfo?['user_id']?.toString();
+      final userCode = userInfo?['code']?.toString(); // UUID dari login
 
-      if (userId == null) {
-        throw Exception('User ID not found');
+      if (userCode == null) {
+        throw Exception('User code not found');
       }
 
-      final response = await _ticketService.getTicketHistory(userId: userId);
+      final response = await _ticketService.getTicketHistory(userId: userCode);
 
       if (response['success']) {
         final parsedTickets = _ticketService.parseTicketHistory(response);

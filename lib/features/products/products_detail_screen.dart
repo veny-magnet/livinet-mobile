@@ -4,6 +4,7 @@ import '../../core/services/product_service.dart';
 import '../../core/services/product_detail_service.dart';
 import '../../core/services/address_service.dart';
 import '../../core/services/user_profile_service.dart';
+import '../../core/services/auth_service.dart';
 import '../../core/widgets/order_dialog.dart';
 import '../../core/models/order_models.dart';
 
@@ -31,6 +32,7 @@ class _ProductsDetailScreenState extends State<ProductsDetailScreen> {
   ProductDetail? productDetail;
   String locationText = '';
   String userId = '';
+  String userCode = ''; // UUID dari login
 
   // Get display values
   String get displayTitle => widget.product?.name ?? widget.title ?? '';
@@ -56,8 +58,8 @@ class _ProductsDetailScreenState extends State<ProductsDetailScreen> {
         if (widget.product != null) _loadProductDetail(widget.product!.pid),
       ]);
 
-      // After userId is available, load location
-      if (userId.isNotEmpty) {
+      // After userCode is available, load location
+      if (userCode.isNotEmpty) {
         await _loadLocation();
       } else {
         locationText = widget.location ?? 'Location not available';
@@ -76,12 +78,23 @@ class _ProductsDetailScreenState extends State<ProductsDetailScreen> {
 
   Future<void> _loadUserProfile() async {
     try {
-      final result = await UserProfileService.instance.getCurrentUserProfile();
+      // Get user info from auth untuk extract userCode (UUID)
+      final authService = AuthService();
+      final userInfo = await authService.getCurrentUser();
 
+      if (userInfo != null) {
+        userCode = userInfo['code']?.toString() ?? ''; // UUID dari login
+        userId = userInfo['user_id']?.toString() ?? '';
+      }
+
+      // Also get profile data
+      final result = await UserProfileService.instance.getCurrentUserProfile();
       if (result['success'] == true && result['data'] != null) {
         final data = result['data'];
-        // Don't call setState here - will be called once in _loadData
-        userId = data.userId ?? '';
+        // userCode already set from auth above
+        if (userId.isEmpty) {
+          userId = data.userId ?? '';
+        }
       }
     } catch (e) {
       // Silently handle error
@@ -90,12 +103,12 @@ class _ProductsDetailScreenState extends State<ProductsDetailScreen> {
 
   Future<void> _loadLocation() async {
     try {
-      if (userId.isEmpty) {
+      if (userCode.isEmpty) {
         locationText = widget.location ?? 'Location not available';
         return;
       }
 
-      final result = await AddressService.instance.getUserAddresses(userId);
+      final result = await AddressService.instance.getUserAddresses(userCode);
 
       if (result['success'] == true && result['data'] != null) {
         final List<UserAddress> addresses = result['data'] as List<UserAddress>;

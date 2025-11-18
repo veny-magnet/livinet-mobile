@@ -57,7 +57,7 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
       final authService = AuthService();
       final currentUser = await authService.getCurrentUser();
 
-      if (currentUser == null || currentUser['user_id'] == null) {
+      if (currentUser == null || currentUser['code'] == null) {
         setState(() {
           errorMessage = 'User session not found';
           isLoading = false;
@@ -65,15 +65,15 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
         return;
       }
 
-      userId = currentUser['user_id'] as String;
+      userId = currentUser['code'] as String;
 
       // Get selected address
-      final selectedAddressId = AddressManager.instance.selectedAddressId;
+      final selectedAddressCode = AddressManager.instance.selectedAddressCode;
 
       // Get products from service
       final result = await ProductService.instance.getProducts(
         userId: userId,
-        addressId: selectedAddressId,
+        addressId: selectedAddressCode,
       );
 
       if (result['success'] == true && result['data'] != null) {

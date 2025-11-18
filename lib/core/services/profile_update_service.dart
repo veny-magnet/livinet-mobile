@@ -242,7 +242,7 @@ class ProfileUpdateService {
 
       // Prepare request body
       final Map<String, dynamic> requestBody = {
-        'user_id': userId,
+        'code': userId,
         'old_password': oldPassword,
         'new_password': newPassword,
         'confirm_password': confirmPassword,

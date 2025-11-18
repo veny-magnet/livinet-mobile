@@ -58,8 +58,8 @@ class _AddressDetailScreenState extends State<AddressDetailScreen> {
 
     try {
       final result = await AddressService.instance.updateAddress(
-        userId: widget.address.userId,
-        addressId: widget.address.addressId,
+        userCode: widget.address.userCode,
+        code: widget.address.code,
         address: _addressController.text.trim(),
       );
 
@@ -120,8 +120,8 @@ class _AddressDetailScreenState extends State<AddressDetailScreen> {
 
         try {
           final result = await AddressService.instance.deleteAddress(
-            userId: widget.address.userId,
-            addressId: widget.address.addressId,
+            userCode: widget.address.userCode,
+            code: widget.address.code,
           );
 
           // Close loading dialog
@@ -136,11 +136,6 @@ class _AddressDetailScreenState extends State<AddressDetailScreen> {
                 title: 'Success',
                 message: result['message'] ?? 'Address deleted successfully!',
                 onConfirm: () {
-                  // Call callback to refresh parent screen
-                  widget.onAddressDeleted?.call();
-
-                  // Pop twice: once for dialog, once for this screen
-                  Navigator.of(context).pop();
                   Navigator.of(context).pop();
                 },
               );

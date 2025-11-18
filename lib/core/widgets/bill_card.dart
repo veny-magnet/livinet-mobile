@@ -20,7 +20,7 @@ class BillCard extends StatefulWidget {
   final bool isProcessing;
   final bool useOrderDetails;
   final String? userId;
-  final int? userAddressId;
+  final String? userAddressId;
   final order_detail.OrderDetail? orderDetailData;
 
   const BillCard({
@@ -42,7 +42,7 @@ class BillCard extends StatefulWidget {
   factory BillCard.fromOrderDetail({
     required order_detail.OrderDetail orderDetail,
     String? userId,
-    int? userAddressId,
+    String? userAddressId,
     VoidCallback? onPayPressed,
     bool isProcessing = false,
   }) {
@@ -117,7 +117,7 @@ class _BillCardState extends State<BillCard> {
       final authService = AuthService();
       final userData = await authService.getCurrentUser();
 
-      if (userData == null || userData['user_id'] == null) {
+      if (userData == null || userData['code'] == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Please login first to make payment'),
@@ -127,9 +127,9 @@ class _BillCardState extends State<BillCard> {
         return;
       }
 
-      // Get user addresses to use in order
+      // Get user addresses using code (UUID)
       final addressResult = await AddressService.instance.getUserAddresses(
-        userData['user_id'],
+        userData['code'],
       );
 
       if (addressResult['success'] != true || addressResult['data'] == null) {
@@ -161,21 +161,21 @@ class _BillCardState extends State<BillCard> {
         return; // User cancelled
       }
 
-      // Use bill's userAddressId if available, otherwise use first address
-      final userAddressId =
-          widget.billData!.userAddressId ?? addresses.first.addressId;
+      // Use bill's userAddressCode if available, otherwise use first address code
+      final userAddressCode =
+          (widget.billData!.userAddressId as String?) ?? addresses.first.code;
 
       // Get product ID from API based on bill context
       final productId = await _getProductIdForBill(
-        userData['user_id'],
-        userAddressId,
+        userData['code'],
+        userAddressCode,
       );
 
       // Create order request for existing bill payment
       final orderRequest = OrderRequest(
-        userId: userData['user_id'],
+        userCode: userData['code'],
         productId: productId,
-        userAddressId: userAddressId,
+        addressCode: userAddressCode,
         level: orderDetails['level']!,
         block: orderDetails['block']!,
         unitNumber: orderDetails['unitNumber']!,
@@ -221,12 +221,15 @@ class _BillCardState extends State<BillCard> {
   }
 
   /// Get appropriate product ID for bill payment
-  Future<int> _getProductIdForBill(String userId, int userAddressId) async {
+  Future<dynamic> _getProductIdForBill(
+    String userId,
+    String userAddressCode,
+  ) async {
     try {
       // Use the dedicated ProductService method for getting bill-specific product ID
       final productId = await ProductService.instance.getProductIdForBill(
         userId: userId,
-        userAddressId: userAddressId,
+        userAddressId: userAddressCode,
         planName: widget.planName,
         invoiceId: widget.billData?.invoiceId,
       );

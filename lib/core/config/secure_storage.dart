@@ -15,7 +15,7 @@ class SecureStorage {
   // Storage Keys
   static const String _keyAccessToken = 'access_token';
   static const String _keyRefreshToken = 'refresh_token';
-  static const String _keyUserId = 'user_id';
+  static const String _keyUserCode = 'user_code';
   static const String _keyUserEmail = 'user_email';
   static const String _keyUserName = 'user_name';
 
@@ -37,12 +37,21 @@ class SecureStorage {
   }
 
   // User Data Management
+  Future<void> saveUserCode(String userCode) async {
+    await _storage.write(key: _keyUserCode, value: userCode);
+  }
+
+  Future<String?> getUserCode() async {
+    return await _storage.read(key: _keyUserCode);
+  }
+
+  // Deprecated: Use getUserCode() instead - kept for backwards compatibility
   Future<void> saveUserId(String userId) async {
-    await _storage.write(key: _keyUserId, value: userId);
+    await saveUserCode(userId);
   }
 
   Future<String?> getUserId() async {
-    return await _storage.read(key: _keyUserId);
+    return await getUserCode();
   }
 
   Future<void> saveUserEmail(String email) async {
@@ -81,7 +90,7 @@ class SecureStorage {
   }
 
   Future<void> clearUserData() async {
-    await _storage.delete(key: _keyUserId);
+    await _storage.delete(key: _keyUserCode);
     await _storage.delete(key: _keyUserEmail);
     await _storage.delete(key: _keyUserName);
   }

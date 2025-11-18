@@ -151,7 +151,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final authService = AuthService();
       final currentUser = await authService.getCurrentUser();
 
-      if (currentUser == null || currentUser['user_id'] == null) {
+      if (currentUser == null || currentUser['code'] == null) {
         if (mounted) {
           Navigator.of(context).pop(); // Close loading dialog
           ScaffoldMessenger.of(context).showSnackBar(
@@ -164,7 +164,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         return;
       }
 
-      final userId = currentUser['user_id'] as String;
+      final userId = currentUser['code'] as String;
 
       // Get original profile data
       final profileResult = await UserProfileService.instance.getUserProfile(

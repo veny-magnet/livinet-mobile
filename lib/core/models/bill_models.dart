@@ -1,11 +1,11 @@
 class BillHistoryRequest {
-  final String userId;
-  final int userAddressId;
+  final String userCode; // UUID identifier
+  final String addressCode; // Address code/UUID
 
-  BillHistoryRequest({required this.userId, required this.userAddressId});
+  BillHistoryRequest({required this.userCode, required this.addressCode});
 
   Map<String, dynamic> toJson() {
-    return {'user_id': userId, 'user_address_id': userAddressId};
+    return {'code': userCode, 'address_code': addressCode};
   }
 }
 

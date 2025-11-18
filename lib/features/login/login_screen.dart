@@ -92,9 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         // Subscribe to push notification topics after successful login
         final currentUser = await _authService.getCurrentUser();
-        if (currentUser != null && currentUser['user_id'] != null) {
-          final userId = currentUser['user_id'] as String;
-
+        if (currentUser != null && currentUser['code'] != null) {
           setState(() => _loadingMessage = 'Signing in');
         }
 

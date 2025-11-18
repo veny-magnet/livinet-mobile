@@ -13,6 +13,7 @@ import '../../core/services/product_service.dart';
 import '../../core/services/subscription_service.dart';
 import '../../core/services/address_manager.dart';
 import '../../core/services/address_service.dart';
+import '../../core/services/auth_service.dart';
 import 'products_detail_screen.dart';
 import 'upgrade_plan_screen.dart';
 
@@ -26,6 +27,7 @@ class ProductsScreen extends StatefulWidget {
 class _ProductsScreenState extends State<ProductsScreen> {
   String status = '';
   String userId = '';
+  String userCode = ''; // UUID dari login
   bool isLoading = true;
   List<Product> products = [];
   List<Product> addOns = [];
@@ -36,7 +38,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
   // Deduplication & caching
   DateTime? _lastLoadTime;
   static const Duration _cacheDuration = Duration(minutes: 5);
-  int? _lastLoadedAddressId;
+  String? _lastLoadedAddressId;
 
   @override
   void initState() {
@@ -53,19 +55,19 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   void _onAddressChanged(UserAddress? address) {
     // When address changes, recheck subscription status for the new address
-    if (status == 'verified' && userId.isNotEmpty && address != null) {
+    if (status == 'verified' && userCode.isNotEmpty && address != null) {
       Future.delayed(const Duration(milliseconds: 100), () {
         if (mounted) {
-          _recheckSubscriptionForAddress(userId, address.addressId);
+          _recheckSubscriptionForAddress(userCode, address.code);
         }
       });
     }
   }
 
-  bool _shouldReloadData(int? addressId) {
+  bool _shouldReloadData(String? addressCode) {
     // Only reload if address is different OR cache expired
-    if (_lastLoadedAddressId != addressId) {
-      _lastLoadedAddressId = addressId;
+    if (_lastLoadedAddressId != addressCode) {
+      _lastLoadedAddressId = addressCode;
       _lastLoadTime = DateTime.now();
       return true;
     }
@@ -86,17 +88,17 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   Future<void> _recheckSubscriptionForAddress(
     String userId,
-    int addressId,
+    String addressCode,
   ) async {
     // Skip if we're already loading or data is cached
-    if (!_shouldReloadData(addressId)) {
+    if (!_shouldReloadData(addressCode)) {
       return;
     }
 
     try {
-      // Re-check subscription status for the new address - PASS addressId!
+      // Re-check subscription status for the new address - PASS addressCode!
       final subscriptionResult = await SubscriptionService.instance
-          .getUserSubscriptions(userId, addressId: addressId);
+          .getUserSubscriptions(userId, addressId: addressCode);
 
       if (mounted) {
         if (subscriptionResult['success'] == true &&
@@ -118,13 +120,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
           });
 
           // Load add-ons for subscription (already hardcoded)
-          await _loadAddOns(userId, addressId);
+          await _loadAddOns(userCode, addressCode);
         } else {
           // No subscription, load products for this address
           setState(() {
             hasSubscription = false;
           });
-          await _loadProducts(userId, addressId);
+          await _loadProducts(userCode, addressCode);
         }
       }
     } catch (e) {
@@ -133,27 +135,39 @@ class _ProductsScreenState extends State<ProductsScreen> {
         setState(() {
           hasSubscription = false;
         });
-        await _loadProducts(userId, addressId);
+        await _loadProducts(userId, addressCode);
       }
     }
   }
 
   Future<void> _loadUserProfile() async {
     try {
+      // Get user info from auth untuk extract userCode (UUID)
+      final authService = AuthService();
+      final userInfo = await authService.getCurrentUser();
+
+      if (userInfo != null) {
+        userCode = userInfo['code']?.toString() ?? ''; // UUID dari login
+        userId = userInfo['user_id']?.toString() ?? '';
+      }
+
+      // Also get profile data
       final result = await UserProfileService.instance.getCurrentUserProfile();
 
       if (result['success'] == true && result['data'] != null) {
         final data = result['data'];
         setState(() {
           status = data.status ?? '';
-          userId = data.userId ?? '';
+          if (userId.isEmpty) {
+            userId = data.userId ?? '';
+          }
         });
 
-        if (status == 'verified' && userId.isNotEmpty) {
-          await AddressManager.instance.loadDefaultAddress(userId);
+        if (status == 'verified' && userCode.isNotEmpty) {
+          await AddressManager.instance.loadDefaultAddress(userCode);
 
           // Check if user has subscription first
-          await _checkUserSubscription(userId);
+          await _checkUserSubscription(userCode);
         } else {
           setState(() {
             isLoading = false;
@@ -163,6 +177,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
         setState(() {
           status = '';
           userId = '';
+          userCode = '';
           isLoading = false;
         });
       }
@@ -170,20 +185,20 @@ class _ProductsScreenState extends State<ProductsScreen> {
       setState(() {
         status = '';
         userId = '';
+        userCode = '';
         isLoading = false;
-        errorMessage = 'Error loading profile: $e';
       });
     }
   }
 
-  Future<void> _checkUserSubscription(String userId) async {
+  Future<void> _checkUserSubscription(String userCode) async {
     try {
       // Get selected address before checking subscription
-      final selectedAddressId = AddressManager.instance.selectedAddressId;
+      final selectedAddressCode = AddressManager.instance.selectedAddressCode;
 
-      // Pass addressId to subscription service
+      // Pass addressCode to subscription service
       final subscriptionResult = await SubscriptionService.instance
-          .getUserSubscriptions(userId, addressId: selectedAddressId);
+          .getUserSubscriptions(userCode, addressId: selectedAddressCode);
 
       if (subscriptionResult['success'] == true &&
           subscriptionResult['data'] != null &&
@@ -204,25 +219,25 @@ class _ProductsScreenState extends State<ProductsScreen> {
         });
 
         // Load add-ons for subscription
-        await _loadAddOns(userId, selectedAddressId);
+        await _loadAddOns(userCode, selectedAddressCode);
       } else {
         // No subscription, load products normally
 
         setState(() {
           hasSubscription = false;
         });
-        await _loadProducts(userId, selectedAddressId);
+        await _loadProducts(userCode, selectedAddressCode);
       }
     } catch (e) {
       setState(() {
         hasSubscription = false;
       });
-      final selectedAddressId = AddressManager.instance.selectedAddressId;
-      await _loadProducts(userId, selectedAddressId);
+      final selectedAddressCode = AddressManager.instance.selectedAddressCode;
+      await _loadProducts(userId, selectedAddressCode);
     }
   }
 
-  Future<void> _loadProducts(String userId, int? addressId) async {
+  Future<void> _loadProducts(String userCode, String? addressCode) async {
     try {
       if (mounted) {
         setState(() {
@@ -232,8 +247,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
       }
 
       final result = await ProductService.instance.getProducts(
-        userId: userId,
-        addressId: addressId,
+        userId: userCode,
+        addressId: addressCode,
       );
 
       if (mounted) {
@@ -259,7 +274,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
     }
   }
 
-  Future<void> _loadAddOns(String userId, int? addressId) async {
+  Future<void> _loadAddOns(String userCode, String? addressCode) async {
     // Add-ons sudah di-hardcode, tidak perlu load dari API
 
     setState(() {
@@ -508,7 +523,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         ElevatedButton(
                           onPressed: () {
                             final selectedAddressId =
-                                AddressManager.instance.selectedAddressId;
+                                AddressManager.instance.selectedAddressCode;
                             _loadProducts(userId, selectedAddressId);
                           },
                           child: const Text('Retry'),

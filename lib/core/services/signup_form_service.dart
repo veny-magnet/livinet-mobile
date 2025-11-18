@@ -12,7 +12,8 @@ class SignupFormService {
   // Form data storage
   final Map<String, dynamic> _formData = {
     'referralCode': '',
-    'username': '',
+    'firstname': '',
+    'lastname': '',
     'email': '',
     'phone': '',
     'password': '',
@@ -26,7 +27,8 @@ class SignupFormService {
 
   // Getters
   String get referralCode => _formData['referralCode'] ?? '';
-  String get username => _formData['username'] ?? '';
+  String get firstname => _formData['firstname'] ?? '';
+  String get lastname => _formData['lastname'] ?? '';
   String get email => _formData['email'] ?? '';
   String get phone => _formData['phone'] ?? '';
   String get password => _formData['password'] ?? '';
@@ -39,7 +41,8 @@ class SignupFormService {
 
   // Setters
   void setReferralCode(String value) => _formData['referralCode'] = value;
-  void setUsername(String value) => _formData['username'] = value;
+  void setFirstname(String value) => _formData['firstname'] = value;
+  void setLastname(String value) => _formData['lastname'] = value;
   void setEmail(String value) => _formData['email'] = value;
   void setPhone(String value) => _formData['phone'] = value;
   void setPassword(String value) => _formData['password'] = value;
@@ -55,7 +58,8 @@ class SignupFormService {
     _formData.clear();
     _formData.addAll({
       'referralCode': '',
-      'username': '',
+      'firstname': '',
+      'lastname': '',
       'email': '',
       'phone': '',
       'password': '',
@@ -73,7 +77,8 @@ class SignupFormService {
 
   /// Check if form has any data
   bool hasFormData() {
-    return username.isNotEmpty ||
+    return firstname.isNotEmpty ||
+        lastname.isNotEmpty ||
         email.isNotEmpty ||
         phone.isNotEmpty ||
         address.isNotEmpty ||

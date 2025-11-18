@@ -22,7 +22,7 @@ class SubscriptionService {
   /// If [addressId] is null: returns global user subscriptions (all addresses)
   Future<Map<String, dynamic>> getUserSubscriptions(
     String userId, {
-    int? addressId, // Optional: if provided, get per-address subscriptions
+    String? addressId, // Optional: if provided, get per-address subscriptions
     bool forceRefresh = false, // Keep for backward compatibility
   }) async {
     try {
@@ -36,8 +36,8 @@ class SubscriptionService {
       final response = await _apiService.get<Map<String, dynamic>>(
         '/get/subscriptions',
         queryParams: {
-          'user_id': userId,
-          if (addressId != null) 'address_id': addressId.toString(),
+          'code': userId,
+          if (addressId != null) 'address_code': addressId.toString(),
           // If addressId is null, parameter is NOT included (global query)
         },
         fromJson: (json) => json as Map<String, dynamic>,
