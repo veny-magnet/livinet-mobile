@@ -24,7 +24,7 @@ class NotVerifiedWidget extends StatelessWidget {
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
                   return Image.asset(
-                    'assets/images/bg_notverified.jpg',
+                    'assets/images/bg_notverified.png',
                     width: 240,
                     height: 240,
                     fit: BoxFit.cover,

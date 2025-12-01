@@ -103,16 +103,16 @@ class _TicketListScreenState extends State<TicketListScreen>
             width: double.infinity,
             margin: const EdgeInsets.all(16),
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(8),
-            ),
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
             child: Row(
               children: [
-                Icon(
-                  Icons.warning_amber_rounded,
-                  color: Colors.grey.shade600,
-                  size: 20,
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Image.asset(
+                    'assets/images/ticket.png',
+                    fit: BoxFit.contain,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(

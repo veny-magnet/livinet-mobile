@@ -81,8 +81,16 @@ flutter:
     - assets/images/bottom_gradient.png
     - assets/images/top_gradient.png
     - assets/images/jakarta_bg.jpg
-    - assets/images/bg_notverified.jpg
+    - assets/images/bg_notverified.png
     - assets/animations/
+    - assets/images/rocket.png
+    - assets/images/ticket.png
+    - assets/images/forgot_pass_1.png
+    - assets/images/forgot_pass_2.png
+    - assets/images/forgot_pass_3.png
+    - assets/images/onboarding_1.png
+    - assets/images/onboarding_2.png
+    - assets/images/onboarding_3.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'dart:math';
 import '../services/product_service.dart';
+import '../services/banner_service.dart' as banner_service;
 
-class ProductCard extends StatelessWidget {
+class ProductCard extends StatefulWidget {
   final Product? product;
   final String? imageUrl;
   final String? title;
   final String? price;
   final VoidCallback? onTap;
+  final List<banner_service.Banner>? bannerProductList;
 
   const ProductCard({
     super.key,
@@ -15,12 +18,37 @@ class ProductCard extends StatelessWidget {
     this.title,
     this.price,
     this.onTap,
+    this.bannerProductList,
   });
 
+  @override
+  State<ProductCard> createState() => _ProductCardState();
+}
+
+class _ProductCardState extends State<ProductCard> {
+  late String? _cachedBannerUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _cachedBannerUrl = _getRandomBannerUrl();
+  }
+
+  String? _getRandomBannerUrl() {
+    if (widget.bannerProductList == null || widget.bannerProductList!.isEmpty) {
+      return null;
+    }
+    final random = Random();
+    final randomBanner = widget
+        .bannerProductList![random.nextInt(widget.bannerProductList!.length)];
+    return randomBanner.target;
+  }
+
   // Helper getters to prioritize product data over individual params
-  String get displayTitle => product?.name ?? title ?? '';
-  String get displayPrice => product?.formattedPrice ?? price ?? '';
-  String get displayImageUrl => imageUrl ?? '';
+  String get displayTitle => widget.product?.name ?? widget.title ?? '';
+  String get displayPrice =>
+      widget.product?.formattedPrice ?? widget.price ?? '';
+  String get displayImageUrl => widget.imageUrl ?? '';
 
   @override
   Widget build(BuildContext context) {
@@ -51,26 +79,7 @@ class ProductCard extends StatelessWidget {
                 color: const Color(0xFFD9D9D9),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: displayImageUrl.isNotEmpty
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        displayImageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Center(
-                            child: Icon(
-                              Icons.image,
-                              color: Colors.grey,
-                              size: 32,
-                            ),
-                          );
-                        },
-                      ),
-                    )
-                  : const Center(
-                      child: Icon(Icons.image, color: Colors.grey, size: 32),
-                    ),
+              child: _buildBannerImage(),
             ),
 
             const SizedBox(height: 8),
@@ -118,7 +127,7 @@ class ProductCard extends StatelessWidget {
 
                 // Choose Button
                 GestureDetector(
-                  onTap: onTap,
+                  onTap: widget.onTap,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -145,5 +154,39 @@ class ProductCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildBannerImage() {
+    if (_cachedBannerUrl != null && _cachedBannerUrl!.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.network(
+          _cachedBannerUrl!,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return const Center(
+              child: Icon(Icons.image, color: Colors.grey, size: 32),
+            );
+          },
+        ),
+      );
+    } else if (displayImageUrl.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.network(
+          displayImageUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return const Center(
+              child: Icon(Icons.image, color: Colors.grey, size: 32),
+            );
+          },
+        ),
+      );
+    } else {
+      return const Center(
+        child: Icon(Icons.image, color: Colors.grey, size: 32),
+      );
+    }
   }
 }

@@ -14,6 +14,7 @@ import '../../core/services/subscription_service.dart';
 import '../../core/services/address_manager.dart';
 import '../../core/services/address_service.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/banner_service.dart' as banner_service;
 import 'products_detail_screen.dart';
 import 'upgrade_plan_screen.dart';
 
@@ -34,6 +35,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
   String errorMessage = '';
   bool hasSubscription = false;
   String currentPlan = '';
+  List<banner_service.Banner> bannerProductList = [];
 
   // Deduplication & caching
   DateTime? _lastLoadTime;
@@ -44,6 +46,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
   void initState() {
     super.initState();
     _loadUserProfile();
+    _loadBannerProducts();
     AddressManager.instance.addListener(_onAddressChanged);
   }
 
@@ -188,6 +191,24 @@ class _ProductsScreenState extends State<ProductsScreen> {
         userCode = '';
         isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadBannerProducts() async {
+    try {
+      final result = await banner_service.BannerService.instance.getBanners(
+        bannerType: 'banner_product',
+      );
+
+      if (mounted && result['success'] == true) {
+        final List<dynamic> banners = result['data'] ?? [];
+        setState(() {
+          bannerProductList = banners.cast<banner_service.Banner>();
+        });
+      }
+    } catch (e) {
+      // Silently fail - banners are optional enhancement
+      // bannerProductList stays empty, product cards will show regular images
     }
   }
 
@@ -544,6 +565,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       final product = products[index];
                       return ProductCard(
                         product: product,
+                        bannerProductList: bannerProductList,
                         onTap: () {
                           Navigator.push(
                             context,

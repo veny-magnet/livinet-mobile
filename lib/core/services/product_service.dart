@@ -109,7 +109,9 @@ class ProductService {
       }
     } on ApiException catch (e) {
       String errorMessage;
-      if (e.statusCode == 500) {
+      if (e.statusCode == 404) {
+        errorMessage = 'Product not found for this address';
+      } else if (e.statusCode == 500) {
         errorMessage =
             'Server temporarily unavailable. Please try again later.';
       } else if (e.statusCode == 401) {
@@ -189,7 +191,9 @@ class ProductService {
       }
     } on ApiException catch (e) {
       String errorMessage;
-      if (e.statusCode == 500) {
+      if (e.statusCode == 404) {
+        errorMessage = 'Product not found for this address';
+      } else if (e.statusCode == 500) {
         errorMessage =
             'Server temporarily unavailable. Please try again later.';
       } else if (e.statusCode == 401) {

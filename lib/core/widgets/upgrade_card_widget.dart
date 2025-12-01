@@ -94,11 +94,8 @@ class UpgradeCareWidget extends StatelessWidget {
           Container(
             width: 80,
             height: 80,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade200,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(Icons.wifi, color: Colors.grey, size: 32),
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
+            child: Image.asset('assets/images/rocket.png', fit: BoxFit.contain),
           ),
         ],
       ),

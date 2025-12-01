@@ -309,15 +309,24 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     ),
                     const SizedBox(height: 50),
 
-                    // --- Placeholder Image (square)
+                    // --- Step Image (square)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: AspectRatio(
                         aspectRatio: 1, // square
                         child: Container(
                           decoration: BoxDecoration(
-                            color: Colors.grey[300],
                             borderRadius: BorderRadius.circular(16),
+                            image: DecorationImage(
+                              image: AssetImage(
+                                _step == 0
+                                    ? 'assets/images/forgot_pass_1.png'
+                                    : _step == 1
+                                    ? 'assets/images/forgot_pass_2.png'
+                                    : 'assets/images/forgot_pass_3.png',
+                              ),
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
                       ),

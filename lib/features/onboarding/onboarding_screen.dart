@@ -232,29 +232,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                                         width: placeholderSize,
                                                         height: placeholderSize,
                                                         decoration: BoxDecoration(
-                                                          color: const Color(
-                                                            0xFFE0E0E0,
-                                                          ),
                                                           borderRadius:
                                                               BorderRadius.circular(
                                                                 16,
                                                               ),
-                                                          boxShadow: [
-                                                            BoxShadow(
-                                                              color: Colors
-                                                                  .black
-                                                                  .withOpacity(
-                                                                    0.05 *
-                                                                        animValue,
-                                                                  ),
-                                                              blurRadius: 12,
-                                                              offset:
-                                                                  const Offset(
-                                                                    0,
-                                                                    4,
-                                                                  ),
-                                                            ),
-                                                          ],
+                                                        ),
+                                                        child: Image.asset(
+                                                          'assets/images/onboarding_${i + 1}.png',
+                                                          fit: BoxFit.contain,
                                                         ),
                                                       ),
                                                     );

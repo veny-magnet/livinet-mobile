@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -14,7 +15,24 @@ import 'core/monitoring/monitoring_service.dart';
 import 'core/services/session_manager.dart';
 import 'core/widgets/user_interaction_tracker.dart';
 
+// Skip SSL verification ONLY for banner image loading from honeycomb
+class _BannerHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context)
+      ..badCertificateCallback = (X509Certificate cert, String host, int port) {
+        if (host.contains('honeycomb.mybati.co.id')) {
+          return true;
+        }
+        return false;
+      };
+  }
+}
+
 void main() async {
+  // Apply SSL override hanya untuk honeycomb banner domain
+  HttpOverrides.global = _BannerHttpOverrides();
+
   await runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
@@ -108,14 +126,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   Future<void> _checkSessionOnResume() async {
     final isValid = await _sessionManager.isSessionValid();
     if (!isValid) {
-      // Session expired while app was in background
       _sessionManager.logout();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Set context for session manager dialogs
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _sessionManager.setContext(context);
     });
